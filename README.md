@@ -7,32 +7,41 @@ Single-AZ centralized egress deployment demonstrating VM-Series inspection via A
 ## Architecture
 
 ```
-                    ┌─────────────────────────────────────────┐
-                    │         Security VPC 172.16.0.0/16       │
-                    │                                           │
-  Internet ─────── IGW ──► untrust subnet (ENI2, EIP)         │
-                    │       mgmt subnet   (ENI1, EIP) ◄── SSH  │
-                    │       trust subnet  (ENI0) ──┐            │
-                    │       gwlb subnet   [GWLB] ◄─┘            │
-                    │       gwlbe-reserved subnet (empty)        │
-                    └──────────────┬──────────────────────────┘
-                                   │ GWLB Endpoint Service
-                     ┌─────────────┴──────────────┐
-                     │                            │
-        ┌────────────▼──────────┐    ┌────────────▼──────────┐
-        │ Workload VPC 1        │    │ Workload VPC 2        │
-        │ 10.0.0.0/16           │    │ 10.0.0.0/16 ← overlap │
-        │                       │    │                       │
-        │ workload subnet       │    │ workload subnet       │
-        │   10.0.1.10 (EIP)    │    │   10.0.1.10 (EIP)    │
-        │   RT: 0/0 → GWLBE     │    │   RT: 0/0 → GWLBE    │
-        │   RT: mgmt → IGW ─────┼────┼──────────────────────┼── backdoor
-        │ gwlbe subnet          │    │ gwlbe subnet          │
-        │   10.0.2.0/24 [GWLBE] │    │   10.0.2.0/24 [GWLBE]│
-        └───────────────────────┘    └───────────────────────┘
+                              Internet
+                                 │
+                    ┌────────────┴────────────────────────────────┐
+                    │         Security VPC 172.16.0.0/16           │
+                    │                                               │
+                    │  IGW ◄──► ENI2/ethernet1/2 (untrust, EIP)   │
+                    │                    │                          │
+                    │              VM-Series                        │
+                    │                    │                          │
+                    │           ENI0/ethernet1/1 (trust)           │
+                    │                    │                          │
+                    │                 [GWLB]                        │
+                    │                                               │
+                    │  ENI1/mgmt (EIP) ◄── SSH                     │
+                    └────────────────────┬──────────────────────────┘
+                                         │ GWLB Endpoint Service
+                          ┌──────────────┴──────────────┐
+                          │                             │
+             ┌────────────▼──────────┐   ┌─────────────▼─────────┐
+             │ Workload VPC 1        │   │ Workload VPC 2         │
+             │ 10.0.0.0/16           │   │ 10.0.0.0/16            │
+             │ [GWLBE] 10.0.2.0/24   │   │ [GWLBE] 10.0.2.0/24   │
+             │ VM: 10.0.1.10 (EIP)   │   │ VM: 10.0.1.10 (EIP)   │
+             │ RT: 0/0 → GWLBE       │   │ RT: 0/0 → GWLBE        │
+             │ RT: mgmt → IGW        │   │ RT: mgmt → IGW          │
+             └───────────────────────┘   └────────────────────────┘
 ```
 
-**Traffic path:** Workload VM → GWLBE → GWLB (GENEVE/UDP 6081) → VM-Series trust (ENI0) → inspect → return via GWLB
+**Egress traffic path (C2S):**
+1. Workload VM → RT `0/0 → GWLBE` → GWLB (GENEVE/UDP 6081) → ENI0 (`ethernet1/1`)
+2. VM-Series decaps GENEVE, performs route lookup on inner destination IP (`aws-gwlb-overlay-routing:enable`); GWLB endpoint ID in GENEVE header disambiguates which VPC the packet came from despite identical source IPs
+3. Policy allows → interface NAT SNATs to `ethernet1/2` → exits ENI2 → IGW EIP NAT → Internet
+
+**Return path (S2C):**
+Internet → IGW EIP NAT → ENI2 (`ethernet1/2`) → reverse SNAT → `ethernet1/1` → GWLB (GENEVE with original endpoint ID) → GWLBE → Workload VM
 
 **VM-Series interface mapping** (`mgmt-interface-swap=enable`):
 
