@@ -99,6 +99,7 @@ resource "scm_layer3_subinterface" "vpc1" {
   parent_interface = var.panos_trust_iface
   folder           = local.folder
   tag              = 1
+  dhcp_client      = { create_default_route = false }
 }
 
 resource "scm_layer3_subinterface" "vpc2" {
@@ -106,6 +107,7 @@ resource "scm_layer3_subinterface" "vpc2" {
   parent_interface = var.panos_trust_iface
   folder           = local.folder
   tag              = 2
+  dhcp_client      = { create_default_route = false }
 }
 
 # ---------------------------------------------------------------------------
