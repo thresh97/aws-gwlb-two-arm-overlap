@@ -944,6 +944,11 @@ output "panos_set_commands" {
     set network interface ethernet ${var.panos_untrust_iface} layer3 dhcp-client create-default-route yes
     set network interface ethernet ${var.panos_untrust_iface} layer3 dhcp-client enable yes
 
+    # --- Interface management profile - GWLB health check ---
+    set network profiles interface-management-profile gwlb http yes
+    set network profiles interface-management-profile gwlb permitted-ip ${aws_subnet.gwlb.cidr_block}
+    set network interface ethernet ${var.panos_trust_iface} layer3 interface-management-profile gwlb
+
     # --- Security zones ---
     set zone ${var.panos_zone_trust} network layer3 ${var.panos_trust_iface}
     set zone ${var.panos_zone_vpc1} network layer3 ${var.panos_subif_vpc1}

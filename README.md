@@ -151,6 +151,11 @@ set network interface ethernet ethernet1/1 layer3 units ethernet1/1.2 dhcp-clien
 set network interface ethernet ethernet1/2 layer3 dhcp-client create-default-route yes
 set network interface ethernet ethernet1/2 layer3 dhcp-client enable yes
 
+# --- Interface management profile - GWLB health check ---
+set network profiles interface-management-profile gwlb http yes
+set network profiles interface-management-profile gwlb permitted-ip 172.16.4.0/24
+set network interface ethernet ethernet1/1 layer3 interface-management-profile gwlb
+
 # --- Security zones ---
 set zone trust network layer3 ethernet1/1
 set zone workload1 network layer3 ethernet1/1.1
