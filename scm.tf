@@ -84,12 +84,7 @@ resource "scm_ethernet_interface" "trust" {
     interface_management_profile = "gwlb"
   }
 
-  depends_on = [
-    scm_interface_management_profile.gwlb,
-    scm_zone.trust,
-    scm_zone.workload1,
-    scm_zone.workload2,
-  ]
+  depends_on = [scm_interface_management_profile.gwlb]
 }
 
 resource "scm_ethernet_interface" "untrust" {
@@ -104,8 +99,6 @@ resource "scm_ethernet_interface" "untrust" {
       create_default_route = true
     }
   }
-
-  depends_on = [scm_zone.public]
 }
 
 # ---------------------------------------------------------------------------
@@ -145,6 +138,7 @@ resource "scm_zone" "trust" {
   network = {
     layer3 = ["$eth-data"]
   }
+  depends_on = [scm_ethernet_interface.trust]
 }
 
 resource "scm_zone" "workload1" {
@@ -154,6 +148,7 @@ resource "scm_zone" "workload1" {
   network = {
     layer3 = ["$eth-data.1"]
   }
+  depends_on = [scm_layer3_subinterface.vpc1]
 }
 
 resource "scm_zone" "workload2" {
@@ -163,6 +158,7 @@ resource "scm_zone" "workload2" {
   network = {
     layer3 = ["$eth-data.2"]
   }
+  depends_on = [scm_layer3_subinterface.vpc2]
 }
 
 resource "scm_zone" "public" {
@@ -172,6 +168,7 @@ resource "scm_zone" "public" {
   network = {
     layer3 = ["$eth-public"]
   }
+  depends_on = [scm_ethernet_interface.untrust]
 }
 
 # ---------------------------------------------------------------------------
