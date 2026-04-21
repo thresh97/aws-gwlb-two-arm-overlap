@@ -402,18 +402,11 @@ resource "aws_security_group" "trust" {
   tags = { Name = "${var.prefix}-vmseries-trust-sg" }
 }
 
-# Untrust - internet-facing data plane
+# Untrust - internet-facing data plane (egress only; return traffic is stateful)
 resource "aws_security_group" "untrust" {
   name        = "${var.prefix}-vmseries-untrust-sg"
   description = "VM-Series untrust interface"
   vpc_id      = aws_vpc.security.id
-
-  ingress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
 
   egress {
     from_port   = 0
@@ -457,10 +450,9 @@ resource "aws_eip_association" "mgmt" {
 
 # ENI2 - Untrust (eth2 with mgmt-interface-swap), gets EIP
 resource "aws_network_interface" "untrust" {
-  subnet_id         = aws_subnet.untrust.id
-  security_groups   = [aws_security_group.untrust.id]
-  source_dest_check = false
-  tags              = { Name = "${var.prefix}-vmseries-untrust-eni" }
+  subnet_id       = aws_subnet.untrust.id
+  security_groups = [aws_security_group.untrust.id]
+  tags            = { Name = "${var.prefix}-vmseries-untrust-eni" }
 }
 
 resource "aws_eip" "untrust" {
