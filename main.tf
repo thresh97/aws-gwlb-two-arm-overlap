@@ -1,5 +1,5 @@
 # =============================================================================
-# AWS VM-Series + GWLB — Art of the Possible Validation
+# AWS VM-Series + GWLB - Art of the Possible Validation
 #
 # Architecture (single AZ):
 #   Security VPC (172.16.0.0/16)
@@ -9,7 +9,7 @@
 #     - GWLB Endpoint Service (auto-accept)
 #     - GWLBE reserved subnet (created, no endpoint deployed)
 #
-#   Workload VPC 1 & 2 (both 10.0.0.0/16 — intentionally overlapping)
+#   Workload VPC 1 & 2 (both 10.0.0.0/16 - intentionally overlapping)
 #     - GWLBE in gwlbe subnet connects to GWLB Endpoint Service
 #     - Workload subnet: 0/0 → GWLBE, mgmt_cidrs → IGW (backdoor)
 #     - Workload EC2 with EIP
@@ -180,7 +180,7 @@ variable "panos_zone_vpc2" {
 }
 
 # ---------------------------------------------------------------------------
-# AMI Lookup — VM-Series BYOL
+# AMI Lookup - VM-Series BYOL
 # ---------------------------------------------------------------------------
 
 data "aws_ami" "vmseries" {
@@ -267,7 +267,7 @@ resource "aws_subnet" "gwlb" {
   tags              = { Name = "${var.prefix}-gwlb-subnet" }
 }
 
-# Reserved — no endpoint deployed, available for future use
+# Reserved - no endpoint deployed, available for future use
 resource "aws_subnet" "gwlbe_reserved" {
   vpc_id            = aws_vpc.security.id
   cidr_block        = "172.16.5.0/24"
@@ -331,7 +331,7 @@ resource "aws_route_table_association" "gwlb" {
 # Security Groups
 # ---------------------------------------------------------------------------
 
-# Management — SSH, ICMP, HTTP, HTTPS from mgmt_cidrs
+# Management - SSH, ICMP, HTTP, HTTPS from mgmt_cidrs
 resource "aws_security_group" "mgmt" {
   name        = "${var.prefix}-vmseries-mgmt-sg"
   description = "VM-Series management interface"
@@ -364,10 +364,10 @@ resource "aws_security_group" "mgmt" {
   tags = { Name = "${var.prefix}-vmseries-mgmt-sg" }
 }
 
-# Trust — allow GENEVE (UDP 6081) from GWLB + all return traffic
+# Trust - allow GENEVE (UDP 6081) from GWLB + all return traffic
 resource "aws_security_group" "trust" {
   name        = "${var.prefix}-vmseries-trust-sg"
-  description = "VM-Series trust interface — GWLB GENEVE traffic"
+  description = "VM-Series trust interface - GWLB GENEVE traffic"
   vpc_id      = aws_vpc.security.id
 
   ingress {
@@ -396,7 +396,7 @@ resource "aws_security_group" "trust" {
   tags = { Name = "${var.prefix}-vmseries-trust-sg" }
 }
 
-# Untrust — internet-facing data plane
+# Untrust - internet-facing data plane
 resource "aws_security_group" "untrust" {
   name        = "${var.prefix}-vmseries-untrust-sg"
   description = "VM-Series untrust interface"
@@ -424,7 +424,7 @@ resource "aws_security_group" "untrust" {
 # mgmt-interface-swap=enable: ENI0=trust(eth0), ENI1=mgmt(eth1), ENI2=untrust(eth2)
 # ---------------------------------------------------------------------------
 
-# ENI0 — Trust (primary, eth0 with mgmt-interface-swap)
+# ENI0 - Trust (primary, eth0 with mgmt-interface-swap)
 resource "aws_network_interface" "trust" {
   subnet_id         = aws_subnet.trust.id
   security_groups   = [aws_security_group.trust.id]
@@ -432,7 +432,7 @@ resource "aws_network_interface" "trust" {
   tags              = { Name = "${var.prefix}-vmseries-trust-eni" }
 }
 
-# ENI1 — Management (eth1 with mgmt-interface-swap), gets EIP
+# ENI1 - Management (eth1 with mgmt-interface-swap), gets EIP
 resource "aws_network_interface" "mgmt" {
   subnet_id       = aws_subnet.mgmt.id
   security_groups = [aws_security_group.mgmt.id]
@@ -449,7 +449,7 @@ resource "aws_eip_association" "mgmt" {
   network_interface_id = aws_network_interface.mgmt.id
 }
 
-# ENI2 — Untrust (eth2 with mgmt-interface-swap), gets EIP
+# ENI2 - Untrust (eth2 with mgmt-interface-swap), gets EIP
 resource "aws_network_interface" "untrust" {
   subnet_id         = aws_subnet.untrust.id
   security_groups   = [aws_security_group.untrust.id]
@@ -533,19 +533,19 @@ resource "aws_instance" "vmseries" {
   instance_type = var.instance_type
   key_name      = aws_key_pair.main.key_name
 
-  # ENI0 — trust interface (primary with mgmt-interface-swap)
+  # ENI0 - trust interface (primary with mgmt-interface-swap)
   network_interface {
     device_index         = 0
     network_interface_id = aws_network_interface.trust.id
   }
 
-  # ENI1 — management
+  # ENI1 - management
   network_interface {
     device_index         = 1
     network_interface_id = aws_network_interface.mgmt.id
   }
 
-  # ENI2 — untrust
+  # ENI2 - untrust
   network_interface {
     device_index         = 2
     network_interface_id = aws_network_interface.untrust.id
@@ -572,7 +572,7 @@ resource "aws_instance" "vmseries" {
 
 # ===========================================================================
 # WORKLOAD VPC 1
-# CIDR 10.0.0.0/16 — intentionally same as Workload VPC 2 (overlapping)
+# CIDR 10.0.0.0/16 - intentionally same as Workload VPC 2 (overlapping)
 # ===========================================================================
 
 resource "aws_vpc" "workload1" {
@@ -654,7 +654,7 @@ resource "aws_route_table_association" "workload1_gwlbe" {
 # Workload VM 1
 resource "aws_security_group" "workload1" {
   name        = "${var.prefix}-workload1-sg"
-  description = "Workload 1 VM — management access"
+  description = "Workload 1 VM - management access"
   vpc_id      = aws_vpc.workload1.id
 
   dynamic "ingress" {
@@ -706,7 +706,7 @@ resource "aws_eip_association" "workload1" {
 
 # ===========================================================================
 # WORKLOAD VPC 2
-# CIDR 10.0.0.0/16 — same as Workload VPC 1 (intentionally overlapping)
+# CIDR 10.0.0.0/16 - same as Workload VPC 1 (intentionally overlapping)
 # ===========================================================================
 
 resource "aws_vpc" "workload2" {
@@ -786,7 +786,7 @@ resource "aws_route_table_association" "workload2_gwlbe" {
 # Workload VM 2
 resource "aws_security_group" "workload2" {
   name        = "${var.prefix}-workload2-sg"
-  description = "Workload 2 VM — management access"
+  description = "Workload 2 VM - management access"
   vpc_id      = aws_vpc.workload2.id
 
   dynamic "ingress" {
@@ -841,7 +841,7 @@ resource "aws_eip_association" "workload2" {
 # ===========================================================================
 
 output "vmseries_mgmt_eip" {
-  description = "VM-Series management EIP — SSH target for PAN-OS CLI"
+  description = "VM-Series management EIP - SSH target for PAN-OS CLI"
   value       = aws_eip.mgmt.public_ip
 }
 
@@ -886,7 +886,7 @@ output "panos_set_commands" {
   value = !var.generate_panos_config ? null : <<-EOT
 
     # ==========================================================
-    # VM-Series — AWS GWLB Two-Arm Overlay Routing
+    # VM-Series - AWS GWLB Two-Arm Overlay Routing
     # Paste in configure mode, then commit
     # ==========================================================
 
@@ -922,7 +922,7 @@ output "panos_set_commands" {
     set network ${var.panos_router_type} ${var.panos_vr} interface ${var.panos_subif_vpc1}
     set network ${var.panos_router_type} ${var.panos_vr} interface ${var.panos_subif_vpc2}
 
-    # --- Static route — overlapping workload VPC CIDR via trust subnet DGW ---
+    # --- Static route - overlapping workload VPC CIDR via trust subnet DGW ---
     # Enables return path routing for workload traffic; overlay routing uses
     # GWLB endpoint ID (not dest IP) to determine egress sub-interface
     set network ${var.panos_router_type} ${var.panos_vr} routing-table ip static-route workload-vpc-overlap destination 10.0.0.0/16 nexthop ip-address ${cidrhost("172.16.2.0/24", 1)}
@@ -946,7 +946,7 @@ output "panos_set_commands" {
     set rulebase security rules vpc2-to-internet service any
     set rulebase security rules vpc2-to-internet action allow
 
-    # --- NAT policy — interface SNAT for both workload zones ---
+    # --- NAT policy - interface SNAT for both workload zones ---
     set rulebase nat rules workload-egress-snat from [ ${var.panos_zone_vpc1} ${var.panos_zone_vpc2} ]
     set rulebase nat rules workload-egress-snat to ${var.panos_zone_untrust}
     set rulebase nat rules workload-egress-snat source any
