@@ -354,7 +354,7 @@ resource "null_resource" "scm_commit" {
         --data-urlencode "scope=$SCOPE" \
         | jq -r '.access_token')
 
-      RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST \
+      RESPONSE=$(curl -s -w "\nHTTP_STATUS:%%{http_code}" -X POST \
         "https://api.sase.paloaltonetworks.com/sse/config/v1/config-versions/candidate:commit" \
         -H "Authorization: Bearer $TOKEN" \
         -H "Content-Type: application/json" \
