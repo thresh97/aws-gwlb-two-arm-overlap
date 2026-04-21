@@ -572,6 +572,10 @@ resource "aws_instance" "vmseries" {
     volume_type = "gp3"
   }
 
+  lifecycle {
+    ignore_changes = [user_data]
+  }
+
   tags = { Name = "${var.prefix}-vmseries" }
 
   depends_on = [
