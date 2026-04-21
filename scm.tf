@@ -185,11 +185,13 @@ resource "scm_logical_router" "main" {
             {
               name        = "10_8"
               destination = "10.0.0.0/8"
+              interface   = "$eth-data"
               nexthop     = { ip_address = cidrhost("172.16.2.0/24", 1) }
             },
             {
               name        = "gwlb_subnet"
               destination = aws_subnet.gwlb.cidr_block
+              interface   = "$eth-data"
               nexthop     = { ip_address = cidrhost("172.16.2.0/24", 1) }
             },
           ]
