@@ -152,6 +152,7 @@ set network interface ethernet ethernet1/2 layer3 dhcp-client create-default-rou
 set network interface ethernet ethernet1/2 layer3 dhcp-client enable yes
 
 # --- Security zones ---
+set zone trust network layer3 ethernet1/1
 set zone workload1 network layer3 ethernet1/1.1
 set zone workload2 network layer3 ethernet1/1.2
 set zone public network layer3 ethernet1/2

@@ -161,6 +161,12 @@ variable "panos_subif_vpc2" {
   description = "PAN-OS sub-interface for Workload VPC 2 GWLBE association"
 }
 
+variable "panos_zone_trust" {
+  type        = string
+  default     = "trust"
+  description = "PAN-OS trust security zone (ethernet1/1 parent interface)"
+}
+
 variable "panos_zone_untrust" {
   type        = string
   default     = "public"
@@ -935,6 +941,7 @@ output "panos_set_commands" {
     set network interface ethernet ${var.panos_untrust_iface} layer3 dhcp-client enable yes
 
     # --- Security zones ---
+    set zone ${var.panos_zone_trust} network layer3 ${var.panos_trust_iface}
     set zone ${var.panos_zone_vpc1} network layer3 ${var.panos_subif_vpc1}
     set zone ${var.panos_zone_vpc2} network layer3 ${var.panos_subif_vpc2}
     set zone ${var.panos_zone_untrust} network layer3 ${var.panos_untrust_iface}
