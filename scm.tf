@@ -50,24 +50,6 @@ locals {
 }
 
 # ---------------------------------------------------------------------------
-# Interface variables
-# ---------------------------------------------------------------------------
-
-resource "scm_variable" "eth_local" {
-  name   = "eth-local"
-  folder = local.folder
-  type   = "interface"
-  value  = var.panos_trust_iface
-}
-
-resource "scm_variable" "eth_internet" {
-  name   = "eth-internet"
-  folder = local.folder
-  type   = "interface"
-  value  = var.panos_untrust_iface
-}
-
-# ---------------------------------------------------------------------------
 # Interface management profile - GWLB health check
 # ---------------------------------------------------------------------------
 
@@ -84,8 +66,9 @@ resource "scm_interface_management_profile" "gwlb" {
 # ---------------------------------------------------------------------------
 
 resource "scm_ethernet_interface" "trust" {
-  name   = "$eth-local"
-  folder = local.folder
+  name          = "$eth-local"
+  default_value = var.panos_trust_iface
+  folder        = local.folder
 
   layer3 = {
     dhcp_client = {
@@ -95,13 +78,12 @@ resource "scm_ethernet_interface" "trust" {
     }
     interface_management_profile = scm_interface_management_profile.gwlb.name
   }
-
-  depends_on = [scm_variable.eth_local]
 }
 
 resource "scm_ethernet_interface" "untrust" {
-  name   = "$eth-internet"
-  folder = local.folder
+  name          = "$eth-internet"
+  default_value = var.panos_untrust_iface
+  folder        = local.folder
 
   layer3 = {
     dhcp_client = {
@@ -109,8 +91,6 @@ resource "scm_ethernet_interface" "untrust" {
       create_default_route = true
     }
   }
-
-  depends_on = [scm_variable.eth_internet]
 }
 
 # ---------------------------------------------------------------------------
