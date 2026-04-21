@@ -9,8 +9,7 @@
 #   - Security rules (per-workload-zone for differentiated policy)
 #   - NAT rule (interface SNAT)
 #
-# NOT managed here (SCM folder scope doesn't accept PAN-OS interface references):
-#   - Ethernet interfaces and sub-interfaces → panos_set_commands output
+# NOT managed here:
 #   - Interface-to-zone binding → panos_set_commands output
 #   - Interface-to-LR binding → panos_set_commands output
 #   - VPCE-to-sub-interface associations → EC2 user-data plugin-op-commands
@@ -71,7 +70,6 @@ resource "scm_variable" "eth_internet" {
 
 # ---------------------------------------------------------------------------
 # Interface management profile - GWLB health check
-# Assigned to ethernet1/1 via panos_set_commands
 # ---------------------------------------------------------------------------
 
 resource "scm_interface_management_profile" "gwlb" {
@@ -80,6 +78,56 @@ resource "scm_interface_management_profile" "gwlb" {
 
   http         = true
   permitted_ip = [{ name = aws_subnet.gwlb.cidr_block }]
+}
+
+# ---------------------------------------------------------------------------
+# Ethernet interfaces
+# ---------------------------------------------------------------------------
+
+resource "scm_ethernet_interface" "trust" {
+  name   = var.panos_trust_iface
+  folder = local.folder
+
+  layer3 = {
+    dhcp_client = {
+      enable               = true
+      create_default_route = false
+      send_hostname        = { enable = false }
+    }
+    interface_management_profile = scm_interface_management_profile.gwlb.name
+  }
+}
+
+resource "scm_ethernet_interface" "untrust" {
+  name   = var.panos_untrust_iface
+  folder = local.folder
+
+  layer3 = {
+    dhcp_client = {
+      enable               = true
+      create_default_route = true
+    }
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Sub-interfaces
+# ---------------------------------------------------------------------------
+
+resource "scm_layer3_subinterface" "vpc1" {
+  name             = var.panos_subif_vpc1
+  parent_interface = var.panos_trust_iface
+  folder           = local.folder
+  tag              = 1
+  dhcp_client      = { create_default_route = false }
+}
+
+resource "scm_layer3_subinterface" "vpc2" {
+  name             = var.panos_subif_vpc2
+  parent_interface = var.panos_trust_iface
+  folder           = local.folder
+  tag              = 2
+  dhcp_client      = { create_default_route = false }
 }
 
 # ---------------------------------------------------------------------------
