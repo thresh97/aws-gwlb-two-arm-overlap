@@ -166,14 +166,8 @@ set zone public network layer3 ethernet1/2
 set network logical-router default vrf default interface [ ethernet1/1 ethernet1/1.1 ethernet1/1.2 ethernet1/2 ]
 
 # --- Static routes ---
-# 10/8 via trust interface (workload return path)
-set network logical-router default vrf default routing-table ip static-route 10_8 destination 10.0.0.0/8
-set network logical-router default vrf default routing-table ip static-route 10_8 interface ethernet1/1
-set network logical-router default vrf default routing-table ip static-route 10_8 nexthop ip-address 172.16.2.1
-# GWLB subnet via trust interface (health check return path)
-set network logical-router default vrf default routing-table ip static-route gwlb_subnet destination 172.16.4.0/24
-set network logical-router default vrf default routing-table ip static-route gwlb_subnet interface ethernet1/1
-set network logical-router default vrf default routing-table ip static-route gwlb_subnet nexthop ip-address 172.16.2.1
+set network logical-router default vrf default routing-table ip static-route 10_8 destination 10.0.0.0/8 interface ethernet1/1 nexthop ip-address 172.16.2.1
+set network logical-router default vrf default routing-table ip static-route gwlb_subnet destination 172.16.4.0/24 interface ethernet1/1 nexthop ip-address 172.16.2.1
 
 # --- Security policy ---
 # Workload → internet: source 10/8, destination NOT 10/8

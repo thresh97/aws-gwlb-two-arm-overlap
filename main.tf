@@ -959,14 +959,8 @@ output "panos_set_commands" {
     set network logical-router ${var.panos_vr} vrf default interface [ ${var.panos_trust_iface} ${var.panos_subif_vpc1} ${var.panos_subif_vpc2} ${var.panos_untrust_iface} ]
 
     # --- Static routes ---
-    # 10/8 via trust interface (workload return path)
-    set network logical-router ${var.panos_vr} vrf default routing-table ip static-route 10_8 destination 10.0.0.0/8
-    set network logical-router ${var.panos_vr} vrf default routing-table ip static-route 10_8 interface ${var.panos_trust_iface}
-    set network logical-router ${var.panos_vr} vrf default routing-table ip static-route 10_8 nexthop ip-address ${cidrhost("172.16.2.0/24", 1)}
-    # GWLB subnet via trust interface (health check return path)
-    set network logical-router ${var.panos_vr} vrf default routing-table ip static-route gwlb_subnet destination ${aws_subnet.gwlb.cidr_block}
-    set network logical-router ${var.panos_vr} vrf default routing-table ip static-route gwlb_subnet interface ${var.panos_trust_iface}
-    set network logical-router ${var.panos_vr} vrf default routing-table ip static-route gwlb_subnet nexthop ip-address ${cidrhost("172.16.2.0/24", 1)}
+    set network logical-router ${var.panos_vr} vrf default routing-table ip static-route 10_8 destination 10.0.0.0/8 interface ${var.panos_trust_iface} nexthop ip-address ${cidrhost("172.16.2.0/24", 1)}
+    set network logical-router ${var.panos_vr} vrf default routing-table ip static-route gwlb_subnet destination ${aws_subnet.gwlb.cidr_block} interface ${var.panos_trust_iface} nexthop ip-address ${cidrhost("172.16.2.0/24", 1)}
 
     # --- Security policy ---
     # Workload → internet: source 10/8, destination NOT 10/8
