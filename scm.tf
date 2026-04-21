@@ -46,7 +46,11 @@ provider "scm" {
 }
 
 locals {
-  folder = var.dgname
+  folder        = var.dgname
+  trust_iface   = replace(var.panos_trust_iface, "ethernet", "")
+  untrust_iface = replace(var.panos_untrust_iface, "ethernet", "")
+  subif_vpc1    = replace(var.panos_subif_vpc1, "ethernet", "")
+  subif_vpc2    = replace(var.panos_subif_vpc2, "ethernet", "")
 }
 
 # ---------------------------------------------------------------------------
@@ -66,7 +70,7 @@ resource "scm_interface_management_profile" "gwlb" {
 # ---------------------------------------------------------------------------
 
 resource "scm_ethernet_interface" "trust" {
-  name   = var.panos_trust_iface
+  name   = local.trust_iface
   folder = local.folder
 
   layer3 = {
@@ -80,7 +84,7 @@ resource "scm_ethernet_interface" "trust" {
 }
 
 resource "scm_ethernet_interface" "untrust" {
-  name   = var.panos_untrust_iface
+  name   = local.untrust_iface
   folder = local.folder
 
   layer3 = {
@@ -96,16 +100,16 @@ resource "scm_ethernet_interface" "untrust" {
 # ---------------------------------------------------------------------------
 
 resource "scm_layer3_subinterface" "vpc1" {
-  name             = var.panos_subif_vpc1
-  parent_interface = var.panos_trust_iface
+  name             = local.subif_vpc1
+  parent_interface = local.trust_iface
   folder           = local.folder
   tag              = 1
   dhcp_client      = { create_default_route = false }
 }
 
 resource "scm_layer3_subinterface" "vpc2" {
-  name             = var.panos_subif_vpc2
-  parent_interface = var.panos_trust_iface
+  name             = local.subif_vpc2
+  parent_interface = local.trust_iface
   folder           = local.folder
   tag              = 2
   dhcp_client      = { create_default_route = false }
@@ -248,7 +252,7 @@ resource "scm_nat_rule" "workload_egress_snat" {
   source_translation = {
     dynamic_ip_and_port = {
       interface_address = {
-        interface = var.panos_untrust_iface
+        interface = local.untrust_iface
       }
     }
   }
