@@ -259,3 +259,54 @@ resource "scm_nat_rule" "workload_egress_snat" {
     }
   }
 }
+
+# ---------------------------------------------------------------------------
+# SCM commit and push
+# Commits candidate config and pushes to the folder before VM-Series boots.
+# aws_instance.vmseries depends on this resource.
+# ---------------------------------------------------------------------------
+
+resource "null_resource" "scm_commit" {
+  triggers = {
+    iface_trust    = scm_ethernet_interface.trust.id
+    iface_untrust  = scm_ethernet_interface.untrust.id
+    subif_vpc1     = scm_layer3_subinterface.vpc1.id
+    subif_vpc2     = scm_layer3_subinterface.vpc2.id
+    zone_trust     = scm_zone.trust.id
+    zone_workload1 = scm_zone.workload1.id
+    zone_workload2 = scm_zone.workload2.id
+    zone_public    = scm_zone.public.id
+    address        = scm_address.rfc1918_10.id
+    logical_router = scm_logical_router.main.id
+    rule_vpc1      = scm_security_rule.workload1_to_internet.id
+    rule_vpc2      = scm_security_rule.workload2_to_internet.id
+    nat_rule       = scm_nat_rule.workload_egress_snat.id
+    mgmt_profile   = scm_interface_management_profile.gwlb.id
+  }
+
+  provisioner "local-exec" {
+    environment = {
+      CLIENT_ID     = var.scm_client_id
+      CLIENT_SECRET = var.scm_client_secret
+      SCOPE         = var.scm_scope
+      FOLDER        = local.folder
+    }
+    command = <<-SCRIPT
+      set -e
+      TOKEN=$(curl -sf -X POST \
+        "https://auth.apps.paloaltonetworks.com/auth/v1/oauth2/access_token" \
+        -H "Content-Type: application/x-www-form-urlencoded" \
+        --data-urlencode "grant_type=client_credentials" \
+        --data-urlencode "client_id=$CLIENT_ID" \
+        --data-urlencode "client_secret=$CLIENT_SECRET" \
+        --data-urlencode "scope=$SCOPE" \
+        | jq -r '.access_token')
+
+      curl -sf -X POST \
+        "https://api.sase.paloaltonetworks.com/sse/config/v1/config-versions/candidate:push" \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "{\"folders\":[\"$FOLDER\"],\"description\":\"Terraform apply\"}"
+    SCRIPT
+  }
+}

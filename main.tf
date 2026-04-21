@@ -29,6 +29,10 @@ terraform {
       source  = "PaloAltoNetworks/scm"
       version = "1.0.9"
     }
+    null = {
+      source  = "hashicorp/null"
+      version = "~> 3.0"
+    }
   }
 }
 
@@ -577,6 +581,7 @@ resource "aws_instance" "vmseries" {
   depends_on = [
     aws_vpc_endpoint.workload1_gwlbe,
     aws_vpc_endpoint.workload2_gwlbe,
+    null_resource.scm_commit,
   ]
 }
 
