@@ -1,17 +1,19 @@
 # =============================================================================
-# SCM Provider - PAN-OS configuration via Strata Cloud Manager
+# SCM Provider - PAN-OS policy configuration via Strata Cloud Manager
 #
-# Configures the SCM folder (var.dgname) with the full firewall policy stack:
+# Manages the SCM folder (var.dgname) with policy-layer objects:
 #   - Interface management profile (GWLB health check)
-#   - Ethernet interfaces and sub-interfaces
-#   - Security zones
-#   - Logical router LR_default with VRF default and static routes
+#   - Security zones (logical policy labels)
+#   - Logical router LR_default with static routes
 #   - Address object for 10/8
 #   - Security rules (per-workload-zone for differentiated policy)
 #   - NAT rule (interface SNAT)
 #
-# VPCE-to-sub-interface associations (plugin-op-commands) are handled via
-# EC2 user-data and cannot be managed through SCM.
+# NOT managed here (SCM folder scope doesn't accept PAN-OS interface references):
+#   - Ethernet interfaces and sub-interfaces → panos_set_commands output
+#   - Interface-to-zone binding → panos_set_commands output
+#   - Interface-to-LR binding → panos_set_commands output
+#   - VPCE-to-sub-interface associations → EC2 user-data plugin-op-commands
 # =============================================================================
 
 # ---------------------------------------------------------------------------
@@ -50,6 +52,7 @@ locals {
 
 # ---------------------------------------------------------------------------
 # Interface management profile - GWLB health check
+# Assigned to ethernet1/1 via panos_set_commands
 # ---------------------------------------------------------------------------
 
 resource "scm_interface_management_profile" "gwlb" {
@@ -61,89 +64,29 @@ resource "scm_interface_management_profile" "gwlb" {
 }
 
 # ---------------------------------------------------------------------------
-# Ethernet interfaces
-# ---------------------------------------------------------------------------
-
-resource "scm_ethernet_interface" "trust" {
-  name   = var.panos_trust_iface
-  folder = local.folder
-
-  layer3 = {
-    dhcp_client = {
-      enable               = true
-      create_default_route = false
-      send_hostname        = { enable = false }
-    }
-    interface_management_profile = scm_interface_management_profile.gwlb.name
-  }
-}
-
-resource "scm_ethernet_interface" "untrust" {
-  name   = var.panos_untrust_iface
-  folder = local.folder
-
-  layer3 = {
-    dhcp_client = {
-      enable               = true
-      create_default_route = true
-    }
-  }
-}
-
-# ---------------------------------------------------------------------------
-# Sub-interfaces (GWLB VPC associations handled via user-data plugin-op-commands)
-# ---------------------------------------------------------------------------
-
-resource "scm_layer3_subinterface" "vpc1" {
-  name             = var.panos_subif_vpc1
-  parent_interface = var.panos_trust_iface
-  folder           = local.folder
-  tag              = 1
-  dhcp_client      = { create_default_route = false }
-}
-
-resource "scm_layer3_subinterface" "vpc2" {
-  name             = var.panos_subif_vpc2
-  parent_interface = var.panos_trust_iface
-  folder           = local.folder
-  tag              = 2
-  dhcp_client      = { create_default_route = false }
-}
-
-# ---------------------------------------------------------------------------
 # Security zones
+# Defined here as policy-layer labels; interface bindings applied via
+# panos_set_commands on the device (folder scope rejects interface references)
 # ---------------------------------------------------------------------------
 
 resource "scm_zone" "trust" {
   name   = var.panos_zone_trust
   folder = local.folder
-  network = {
-    layer3 = [var.panos_trust_iface]
-  }
 }
 
 resource "scm_zone" "workload1" {
   name   = var.panos_zone_vpc1
   folder = local.folder
-  network = {
-    layer3 = [var.panos_subif_vpc1]
-  }
 }
 
 resource "scm_zone" "workload2" {
   name   = var.panos_zone_vpc2
   folder = local.folder
-  network = {
-    layer3 = [var.panos_subif_vpc2]
-  }
 }
 
 resource "scm_zone" "public" {
   name   = var.panos_zone_untrust
   folder = local.folder
-  network = {
-    layer3 = [var.panos_untrust_iface]
-  }
 }
 
 # ---------------------------------------------------------------------------
@@ -158,6 +101,7 @@ resource "scm_address" "rfc1918_10" {
 
 # ---------------------------------------------------------------------------
 # Logical router
+# Interface assignments applied via panos_set_commands on the device
 # ---------------------------------------------------------------------------
 
 resource "scm_logical_router" "main" {
@@ -166,26 +110,18 @@ resource "scm_logical_router" "main" {
 
   vrf = [
     {
-      name      = "default"
-      interface = [
-        var.panos_trust_iface,
-        var.panos_subif_vpc1,
-        var.panos_subif_vpc2,
-        var.panos_untrust_iface,
-      ]
+      name = "default"
       routing_table = {
         ip = {
           static_route = [
             {
               name        = "10_8"
               destination = "10.0.0.0/8"
-              interface   = var.panos_trust_iface
               nexthop     = { ip_address = cidrhost("172.16.2.0/24", 1) }
             },
             {
               name        = "gwlb_subnet"
               destination = aws_subnet.gwlb.cidr_block
-              interface   = var.panos_trust_iface
               nexthop     = { ip_address = cidrhost("172.16.2.0/24", 1) }
             },
           ]
@@ -205,28 +141,32 @@ resource "scm_security_rule" "workload1_to_internet" {
   name   = "${var.panos_zone_vpc1}-to-internet"
   folder = local.folder
 
-  from              = [var.panos_zone_vpc1]
-  to                = [var.panos_zone_untrust]
-  source            = [scm_address.rfc1918_10.name]
-  destination       = [scm_address.rfc1918_10.name]
+  from               = [var.panos_zone_vpc1]
+  to                 = [var.panos_zone_untrust]
+  source             = [scm_address.rfc1918_10.name]
+  destination        = [scm_address.rfc1918_10.name]
   negate_destination = true
-  application       = ["any"]
-  service           = ["any"]
-  action            = "allow"
+  source_user        = ["any"]
+  category           = ["any"]
+  application        = ["any"]
+  service            = ["any"]
+  action             = "allow"
 }
 
 resource "scm_security_rule" "workload2_to_internet" {
   name   = "${var.panos_zone_vpc2}-to-internet"
   folder = local.folder
 
-  from              = [var.panos_zone_vpc2]
-  to                = [var.panos_zone_untrust]
-  source            = [scm_address.rfc1918_10.name]
-  destination       = [scm_address.rfc1918_10.name]
+  from               = [var.panos_zone_vpc2]
+  to                 = [var.panos_zone_untrust]
+  source             = [scm_address.rfc1918_10.name]
+  destination        = [scm_address.rfc1918_10.name]
   negate_destination = true
-  application       = ["any"]
-  service           = ["any"]
-  action            = "allow"
+  source_user        = ["any"]
+  category           = ["any"]
+  application        = ["any"]
+  service            = ["any"]
+  action             = "allow"
 }
 
 # ---------------------------------------------------------------------------
