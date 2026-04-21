@@ -140,6 +140,7 @@ resource "scm_zone" "trust" {
   network = {
     layer3 = [scm_ethernet_interface.trust.name]
   }
+  depends_on = [scm_ethernet_interface.trust]
 }
 
 resource "scm_zone" "workload1" {
@@ -148,6 +149,7 @@ resource "scm_zone" "workload1" {
   network = {
     layer3 = [scm_layer3_subinterface.vpc1.name]
   }
+  depends_on = [scm_layer3_subinterface.vpc1]
 }
 
 resource "scm_zone" "workload2" {
@@ -156,6 +158,7 @@ resource "scm_zone" "workload2" {
   network = {
     layer3 = [scm_layer3_subinterface.vpc2.name]
   }
+  depends_on = [scm_layer3_subinterface.vpc2]
 }
 
 resource "scm_zone" "public" {
@@ -164,6 +167,7 @@ resource "scm_zone" "public" {
   network = {
     layer3 = [scm_ethernet_interface.untrust.name]
   }
+  depends_on = [scm_ethernet_interface.untrust]
 }
 
 # ---------------------------------------------------------------------------
