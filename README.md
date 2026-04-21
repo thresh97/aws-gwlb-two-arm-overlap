@@ -169,16 +169,25 @@ set network logical-router default vrf default interface [ ethernet1/1 ethernet1
 set network logical-router default vrf default routing-table ip static-route 10_8 destination 10.0.0.0/8 interface ethernet1/1 nexthop ip-address 172.16.2.1
 set network logical-router default vrf default routing-table ip static-route gwlb_subnet destination 172.16.4.0/24 interface ethernet1/1 nexthop ip-address 172.16.2.1
 
-# --- Security policy ---
-# Workload → internet: source 10/8, destination NOT 10/8
-set rulebase security rules workload-to-internet from [ workload1 workload2 ]
-set rulebase security rules workload-to-internet to public
-set rulebase security rules workload-to-internet source 10.0.0.0/8
-set rulebase security rules workload-to-internet destination 10.0.0.0/8
-set rulebase security rules workload-to-internet negate-destination yes
-set rulebase security rules workload-to-internet application any
-set rulebase security rules workload-to-internet service any
-set rulebase security rules workload-to-internet action allow
+# --- Security policies ---
+# Separate rules per workload zone enable differentiated policy despite overlapping IPs
+set rulebase security rules workload1-to-internet from workload1
+set rulebase security rules workload1-to-internet to public
+set rulebase security rules workload1-to-internet source 10.0.0.0/8
+set rulebase security rules workload1-to-internet destination 10.0.0.0/8
+set rulebase security rules workload1-to-internet negate-destination yes
+set rulebase security rules workload1-to-internet application any
+set rulebase security rules workload1-to-internet service any
+set rulebase security rules workload1-to-internet action allow
+
+set rulebase security rules workload2-to-internet from workload2
+set rulebase security rules workload2-to-internet to public
+set rulebase security rules workload2-to-internet source 10.0.0.0/8
+set rulebase security rules workload2-to-internet destination 10.0.0.0/8
+set rulebase security rules workload2-to-internet negate-destination yes
+set rulebase security rules workload2-to-internet application any
+set rulebase security rules workload2-to-internet service any
+set rulebase security rules workload2-to-internet action allow
 
 # --- NAT policy - interface SNAT ---
 set rulebase nat rules workload-egress-snat from [ workload1 workload2 ]

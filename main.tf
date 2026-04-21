@@ -954,16 +954,25 @@ output "panos_set_commands" {
     set network logical-router ${var.panos_vr} vrf default routing-table ip static-route 10_8 destination 10.0.0.0/8 interface ${var.panos_trust_iface} nexthop ip-address ${cidrhost("172.16.2.0/24", 1)}
     set network logical-router ${var.panos_vr} vrf default routing-table ip static-route gwlb_subnet destination ${aws_subnet.gwlb.cidr_block} interface ${var.panos_trust_iface} nexthop ip-address ${cidrhost("172.16.2.0/24", 1)}
 
-    # --- Security policy ---
-    # Workload → internet: source 10/8, destination NOT 10/8
-    set rulebase security rules workload-to-internet from [ ${var.panos_zone_vpc1} ${var.panos_zone_vpc2} ]
-    set rulebase security rules workload-to-internet to ${var.panos_zone_untrust}
-    set rulebase security rules workload-to-internet source 10.0.0.0/8
-    set rulebase security rules workload-to-internet destination 10.0.0.0/8
-    set rulebase security rules workload-to-internet negate-destination yes
-    set rulebase security rules workload-to-internet application any
-    set rulebase security rules workload-to-internet service any
-    set rulebase security rules workload-to-internet action allow
+    # --- Security policies ---
+    # Separate rules per workload zone enable differentiated policy despite overlapping IPs
+    set rulebase security rules ${var.panos_zone_vpc1}-to-internet from ${var.panos_zone_vpc1}
+    set rulebase security rules ${var.panos_zone_vpc1}-to-internet to ${var.panos_zone_untrust}
+    set rulebase security rules ${var.panos_zone_vpc1}-to-internet source 10.0.0.0/8
+    set rulebase security rules ${var.panos_zone_vpc1}-to-internet destination 10.0.0.0/8
+    set rulebase security rules ${var.panos_zone_vpc1}-to-internet negate-destination yes
+    set rulebase security rules ${var.panos_zone_vpc1}-to-internet application any
+    set rulebase security rules ${var.panos_zone_vpc1}-to-internet service any
+    set rulebase security rules ${var.panos_zone_vpc1}-to-internet action allow
+
+    set rulebase security rules ${var.panos_zone_vpc2}-to-internet from ${var.panos_zone_vpc2}
+    set rulebase security rules ${var.panos_zone_vpc2}-to-internet to ${var.panos_zone_untrust}
+    set rulebase security rules ${var.panos_zone_vpc2}-to-internet source 10.0.0.0/8
+    set rulebase security rules ${var.panos_zone_vpc2}-to-internet destination 10.0.0.0/8
+    set rulebase security rules ${var.panos_zone_vpc2}-to-internet negate-destination yes
+    set rulebase security rules ${var.panos_zone_vpc2}-to-internet application any
+    set rulebase security rules ${var.panos_zone_vpc2}-to-internet service any
+    set rulebase security rules ${var.panos_zone_vpc2}-to-internet action allow
 
     # --- NAT policy - interface SNAT ---
     set rulebase nat rules workload-egress-snat from [ ${var.panos_zone_vpc1} ${var.panos_zone_vpc2} ]
