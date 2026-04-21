@@ -99,13 +99,90 @@ dgname=<var.dgname>
 vm-series-auto-registration-pin-id=<var.pin_id>
 vm-series-auto-registration-pin-value=<var.pin_value>
 authcodes=<var.authcodes>
-plugin-op-commands=aws-gwlb-inspect:enable,
+plugin-op-commands=advance-routing:enable,
+                   aws-gwlb-inspect:enable,
                    aws-gwlb-overlay-routing:enable,
                    aws-gwlb-associate-vpce:<wl1-gwlbe-id>@ethernet1/1.1,
                    aws-gwlb-associate-vpce:<wl2-gwlbe-id>@ethernet1/1.2
 ```
 
 GWLBE IDs are interpolated from Terraform outputs at apply time — the VM-Series instance depends on both GWLBEs being created first.
+
+---
+
+## PAN-OS Configuration
+
+Generate set commands from Terraform after apply:
+
+```bash
+terraform output -raw panos_set_commands   # requires generate_panos_config=true
+```
+
+Or use the pre-rendered commands below (default variable values). Paste in configure mode, then commit.
+
+```
+# --- Interfaces ---
+# Trust (ENI0): DHCP, no default route
+set network interface ethernet ethernet1/1 layer3 dhcp-client enable yes
+set network interface ethernet ethernet1/1 layer3 dhcp-client send-hostname enable no
+set network interface ethernet ethernet1/1 layer3 dhcp-client create-default-route no
+
+# Sub-interface for Workload VPC 1
+set network interface ethernet ethernet1/1 layer3 units ethernet1/1.1 sdwan-link-settings upstream-nat enable no
+set network interface ethernet ethernet1/1 layer3 units ethernet1/1.1 sdwan-link-settings upstream-nat static-ip
+set network interface ethernet ethernet1/1 layer3 units ethernet1/1.1 sdwan-link-settings enable no
+set network interface ethernet ethernet1/1 layer3 units ethernet1/1.1 sdwan-link-settings ipv6-enable no
+set network interface ethernet ethernet1/1 layer3 units ethernet1/1.1 ndp-proxy enabled no
+set network interface ethernet ethernet1/1 layer3 units ethernet1/1.1 adjust-tcp-mss enable no
+set network interface ethernet ethernet1/1 layer3 units ethernet1/1.1 tag 1
+set network interface ethernet ethernet1/1 layer3 units ethernet1/1.1 dhcp-client create-default-route no
+
+# Sub-interface for Workload VPC 2
+set network interface ethernet ethernet1/1 layer3 units ethernet1/1.2 sdwan-link-settings upstream-nat enable no
+set network interface ethernet ethernet1/1 layer3 units ethernet1/1.2 sdwan-link-settings upstream-nat static-ip
+set network interface ethernet ethernet1/1 layer3 units ethernet1/1.2 sdwan-link-settings enable no
+set network interface ethernet ethernet1/1 layer3 units ethernet1/1.2 sdwan-link-settings ipv6-enable no
+set network interface ethernet ethernet1/1 layer3 units ethernet1/1.2 ndp-proxy enabled no
+set network interface ethernet ethernet1/1 layer3 units ethernet1/1.2 adjust-tcp-mss enable no
+set network interface ethernet ethernet1/1 layer3 units ethernet1/1.2 tag 2
+set network interface ethernet ethernet1/1 layer3 units ethernet1/1.2 dhcp-client create-default-route no
+
+# Public/untrust (ENI2): DHCP, learns default route
+set network interface ethernet ethernet1/2 layer3 dhcp-client create-default-route yes
+set network interface ethernet ethernet1/2 layer3 dhcp-client enable yes
+
+# --- Security zones ---
+set zone workload1 network layer3 ethernet1/1.1
+set zone workload2 network layer3 ethernet1/1.2
+set zone public network layer3 ethernet1/2
+
+# --- Logical router ---
+set network logical-router default vrf default interface [ ethernet1/1 ethernet1/1.1 ethernet1/1.2 ethernet1/2 ]
+
+# --- Static route - 10/8 via trust interface ---
+set network logical-router default vrf default routing-table ip static-route 10_8 destination 10.0.0.0/8
+set network logical-router default vrf default routing-table ip static-route 10_8 interface ethernet1/1
+set network logical-router default vrf default routing-table ip static-route 10_8 nexthop ip-address 172.16.2.1
+
+# --- Security policy ---
+# Workload → internet: source 10/8, destination NOT 10/8
+set rulebase security rules workload-to-internet from [ workload1 workload2 ]
+set rulebase security rules workload-to-internet to public
+set rulebase security rules workload-to-internet source 10.0.0.0/8
+set rulebase security rules workload-to-internet destination 10.0.0.0/8
+set rulebase security rules workload-to-internet negate-destination yes
+set rulebase security rules workload-to-internet application any
+set rulebase security rules workload-to-internet service any
+set rulebase security rules workload-to-internet action allow
+
+# --- NAT policy - interface SNAT ---
+set rulebase nat rules workload-egress-snat from [ workload1 workload2 ]
+set rulebase nat rules workload-egress-snat to public
+set rulebase nat rules workload-egress-snat source 10.0.0.0/8
+set rulebase nat rules workload-egress-snat destination any
+set rulebase nat rules workload-egress-snat service any
+set rulebase nat rules workload-egress-snat source-translation dynamic-ip-and-port interface-address interface ethernet1/2
+```
 
 ---
 
