@@ -163,20 +163,20 @@ variable "panos_subif_vpc2" {
 
 variable "panos_zone_untrust" {
   type        = string
-  default     = "untrust"
+  default     = "public"
   description = "PAN-OS untrust/public security zone"
 }
 
 variable "panos_zone_vpc1" {
   type        = string
-  default     = "workload-vpc-1"
-  description = "PAN-OS security zone for Workload VPC 1 traffic"
+  default     = "workload1"
+  description = "PAN-OS security zone for Workload VPC 1 traffic (ethernet1/1.1)"
 }
 
 variable "panos_zone_vpc2" {
   type        = string
-  default     = "workload-vpc-2"
-  description = "PAN-OS security zone for Workload VPC 2 traffic"
+  default     = "workload2"
+  description = "PAN-OS security zone for Workload VPC 2 traffic (ethernet1/1.2)"
 }
 
 # ---------------------------------------------------------------------------
@@ -905,65 +905,63 @@ output "panos_set_commands" {
     # ==========================================================
 
     # --- Interfaces ---
-    # Untrust (ENI2): DHCP, learns default route
+    # Trust (ENI0): DHCP, no default route
+    set network interface ethernet ${var.panos_trust_iface} layer3 dhcp-client enable yes
+    set network interface ethernet ${var.panos_trust_iface} layer3 dhcp-client send-hostname enable no
+    set network interface ethernet ${var.panos_trust_iface} layer3 dhcp-client create-default-route no
+
+    # Sub-interface for Workload VPC 1
+    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc1} sdwan-link-settings upstream-nat enable no
+    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc1} sdwan-link-settings upstream-nat static-ip
+    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc1} sdwan-link-settings enable no
+    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc1} sdwan-link-settings ipv6-enable no
+    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc1} ndp-proxy enabled no
+    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc1} adjust-tcp-mss enable no
+    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc1} tag 1
+    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc1} dhcp-client create-default-route no
+
+    # Sub-interface for Workload VPC 2
+    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc2} sdwan-link-settings upstream-nat enable no
+    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc2} sdwan-link-settings upstream-nat static-ip
+    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc2} sdwan-link-settings enable no
+    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc2} sdwan-link-settings ipv6-enable no
+    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc2} ndp-proxy enabled no
+    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc2} adjust-tcp-mss enable no
+    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc2} tag 2
+    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc2} dhcp-client create-default-route no
+
+    # Public/untrust (ENI2): DHCP, learns default route
     set network interface ethernet ${var.panos_untrust_iface} layer3 dhcp-client create-default-route yes
     set network interface ethernet ${var.panos_untrust_iface} layer3 dhcp-client enable yes
 
-    # Trust (ENI0): DHCP, no default route
-    set network interface ethernet ${var.panos_trust_iface} layer3 dhcp-client create-default-route no
-    set network interface ethernet ${var.panos_trust_iface} layer3 dhcp-client enable yes
-
-    # Sub-interface for Workload VPC 1 (GWLBE association via user-data)
-    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc1} tag 1
-    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc1} adjust-tcp-mss ipv4-mss-adjustment 150
-    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc1} dhcp-client create-default-route no
-    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc1} dhcp-client enable yes
-
-    # Sub-interface for Workload VPC 2 (GWLBE association via user-data)
-    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc2} tag 2
-    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc2} adjust-tcp-mss ipv4-mss-adjustment 150
-    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc2} dhcp-client create-default-route no
-    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc2} dhcp-client enable yes
-
     # --- Security zones ---
-    set zone ${var.panos_zone_untrust} network layer3 ${var.panos_untrust_iface}
     set zone ${var.panos_zone_vpc1} network layer3 ${var.panos_subif_vpc1}
     set zone ${var.panos_zone_vpc2} network layer3 ${var.panos_subif_vpc2}
+    set zone ${var.panos_zone_untrust} network layer3 ${var.panos_untrust_iface}
 
-    # --- Virtual/logical router ---
-    set network ${var.panos_router_type} ${var.panos_vr} interface ${var.panos_untrust_iface}
-    set network ${var.panos_router_type} ${var.panos_vr} interface ${var.panos_trust_iface}
-    set network ${var.panos_router_type} ${var.panos_vr} interface ${var.panos_subif_vpc1}
-    set network ${var.panos_router_type} ${var.panos_vr} interface ${var.panos_subif_vpc2}
+    # --- Logical router ---
+    set network logical-router ${var.panos_vr} vrf default interface [ ${var.panos_trust_iface} ${var.panos_subif_vpc1} ${var.panos_subif_vpc2} ${var.panos_untrust_iface} ]
 
-    # --- Static route - overlapping workload VPC CIDR via trust subnet DGW ---
-    # Enables return path routing for workload traffic; overlay routing uses
-    # GWLB endpoint ID (not dest IP) to determine egress sub-interface
-    set network ${var.panos_router_type} ${var.panos_vr} routing-table ip static-route workload-vpc-overlap destination 10.0.0.0/16 nexthop ip-address ${cidrhost("172.16.2.0/24", 1)}
+    # --- Static route - 10/8 via trust interface ---
+    set network logical-router ${var.panos_vr} vrf default routing-table ip static-route 10_8 destination 10.0.0.0/8
+    set network logical-router ${var.panos_vr} vrf default routing-table ip static-route 10_8 interface ${var.panos_trust_iface}
+    set network logical-router ${var.panos_vr} vrf default routing-table ip static-route 10_8 nexthop ip-address ${cidrhost("172.16.2.0/24", 1)}
 
-    # --- Security policies ---
-    # Workload VPC 1 → untrust (internet egress)
-    set rulebase security rules vpc1-to-internet from ${var.panos_zone_vpc1}
-    set rulebase security rules vpc1-to-internet to ${var.panos_zone_untrust}
-    set rulebase security rules vpc1-to-internet source any
-    set rulebase security rules vpc1-to-internet destination any
-    set rulebase security rules vpc1-to-internet application any
-    set rulebase security rules vpc1-to-internet service any
-    set rulebase security rules vpc1-to-internet action allow
+    # --- Security policy ---
+    # Workload → internet: source 10/8, destination NOT 10/8
+    set rulebase security rules workload-to-internet from [ ${var.panos_zone_vpc1} ${var.panos_zone_vpc2} ]
+    set rulebase security rules workload-to-internet to ${var.panos_zone_untrust}
+    set rulebase security rules workload-to-internet source 10.0.0.0/8
+    set rulebase security rules workload-to-internet destination 10.0.0.0/8
+    set rulebase security rules workload-to-internet negate-destination yes
+    set rulebase security rules workload-to-internet application any
+    set rulebase security rules workload-to-internet service any
+    set rulebase security rules workload-to-internet action allow
 
-    # Workload VPC 2 → untrust (internet egress)
-    set rulebase security rules vpc2-to-internet from ${var.panos_zone_vpc2}
-    set rulebase security rules vpc2-to-internet to ${var.panos_zone_untrust}
-    set rulebase security rules vpc2-to-internet source any
-    set rulebase security rules vpc2-to-internet destination any
-    set rulebase security rules vpc2-to-internet application any
-    set rulebase security rules vpc2-to-internet service any
-    set rulebase security rules vpc2-to-internet action allow
-
-    # --- NAT policy - interface SNAT for both workload zones ---
+    # --- NAT policy - interface SNAT ---
     set rulebase nat rules workload-egress-snat from [ ${var.panos_zone_vpc1} ${var.panos_zone_vpc2} ]
     set rulebase nat rules workload-egress-snat to ${var.panos_zone_untrust}
-    set rulebase nat rules workload-egress-snat source any
+    set rulebase nat rules workload-egress-snat source 10.0.0.0/8
     set rulebase nat rules workload-egress-snat destination any
     set rulebase nat rules workload-egress-snat service any
     set rulebase nat rules workload-egress-snat source-translation dynamic-ip-and-port interface-address interface ${var.panos_untrust_iface}
