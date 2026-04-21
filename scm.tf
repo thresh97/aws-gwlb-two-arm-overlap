@@ -51,6 +51,25 @@ locals {
 }
 
 # ---------------------------------------------------------------------------
+# Interface variables
+# SCM default variables used to bind interfaces to internet/local zones
+# ---------------------------------------------------------------------------
+
+resource "scm_variable" "eth_local" {
+  name   = "eth-local"
+  folder = local.folder
+  type   = "interface"
+  value  = var.panos_trust_iface
+}
+
+resource "scm_variable" "eth_internet" {
+  name   = "eth-internet"
+  folder = local.folder
+  type   = "interface"
+  value  = var.panos_untrust_iface
+}
+
+# ---------------------------------------------------------------------------
 # Interface management profile - GWLB health check
 # Assigned to ethernet1/1 via panos_set_commands
 # ---------------------------------------------------------------------------
