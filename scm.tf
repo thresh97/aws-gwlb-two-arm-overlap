@@ -132,28 +132,38 @@ resource "scm_layer3_subinterface" "vpc2" {
 
 # ---------------------------------------------------------------------------
 # Security zones
-# Defined here as policy-layer labels; interface bindings applied via
-# panos_set_commands on the device (folder scope rejects interface references)
 # ---------------------------------------------------------------------------
 
 resource "scm_zone" "trust" {
   name   = var.panos_zone_trust
   folder = local.folder
+  network = {
+    layer3 = [scm_ethernet_interface.trust.name]
+  }
 }
 
 resource "scm_zone" "workload1" {
   name   = var.panos_zone_vpc1
   folder = local.folder
+  network = {
+    layer3 = [scm_layer3_subinterface.vpc1.name]
+  }
 }
 
 resource "scm_zone" "workload2" {
   name   = var.panos_zone_vpc2
   folder = local.folder
+  network = {
+    layer3 = [scm_layer3_subinterface.vpc2.name]
+  }
 }
 
 resource "scm_zone" "public" {
   name   = var.panos_zone_untrust
   folder = local.folder
+  network = {
+    layer3 = [scm_ethernet_interface.untrust.name]
+  }
 }
 
 # ---------------------------------------------------------------------------
