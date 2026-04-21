@@ -169,7 +169,6 @@ resource "scm_address" "rfc1918_10" {
 
 # ---------------------------------------------------------------------------
 # Logical router
-# Interface assignments applied via panos_set_commands on the device
 # ---------------------------------------------------------------------------
 
 resource "scm_logical_router" "main" {
@@ -178,7 +177,8 @@ resource "scm_logical_router" "main" {
 
   vrf = [
     {
-      name = "default"
+      name      = "default"
+      interface = ["$eth-data", "$eth-data.1", "$eth-data.2", "$eth-public"]
       routing_table = {
         ip = {
           static_route = [
@@ -196,6 +196,13 @@ resource "scm_logical_router" "main" {
         }
       }
     }
+  ]
+
+  depends_on = [
+    scm_ethernet_interface.trust,
+    scm_ethernet_interface.untrust,
+    scm_layer3_subinterface.vpc1,
+    scm_layer3_subinterface.vpc2,
   ]
 }
 
