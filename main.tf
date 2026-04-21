@@ -562,6 +562,10 @@ resource "aws_instance" "vmseries" {
   EOF
   )
 
+  root_block_device {
+    volume_type = "gp3"
+  }
+
   tags = { Name = "${var.prefix}-vmseries" }
 
   depends_on = [
@@ -691,7 +695,12 @@ resource "aws_instance" "workload1" {
   subnet_id              = aws_subnet.workload1_workload.id
   private_ip             = "10.0.1.10"
   vpc_security_group_ids = [aws_security_group.workload1.id]
-  tags                   = { Name = "${var.prefix}-workload1-vm" }
+
+  root_block_device {
+    volume_type = "gp3"
+  }
+
+  tags = { Name = "${var.prefix}-workload1-vm" }
 }
 
 resource "aws_eip" "workload1" {
@@ -823,7 +832,12 @@ resource "aws_instance" "workload2" {
   subnet_id              = aws_subnet.workload2_workload.id
   private_ip             = "10.0.1.10"
   vpc_security_group_ids = [aws_security_group.workload2.id]
-  tags                   = { Name = "${var.prefix}-workload2-vm" }
+
+  root_block_device {
+    volume_type = "gp3"
+  }
+
+  tags = { Name = "${var.prefix}-workload2-vm" }
 }
 
 resource "aws_eip" "workload2" {
