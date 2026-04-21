@@ -172,7 +172,7 @@ resource "scm_address" "rfc1918_10" {
 # ---------------------------------------------------------------------------
 
 resource "scm_logical_router" "main" {
-  name   = "LR_default"
+  name   = "default"
   folder = local.folder
 
   vrf = [
