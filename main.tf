@@ -558,7 +558,7 @@ resource "aws_instance" "vmseries" {
     vm-series-auto-registration-pin-id=${var.pin_id}
     vm-series-auto-registration-pin-value=${var.pin_value}
     authcodes=${var.authcodes}
-    plugin-op-commands=aws-gwlb-inspect:enable,aws-gwlb-overlay-routing:enable,aws-gwlb-associate-vpce:${aws_vpc_endpoint.workload1_gwlbe.id}@ethernet1/1.1,aws-gwlb-associate-vpce:${aws_vpc_endpoint.workload2_gwlbe.id}@ethernet1/1.2
+    plugin-op-commands=advance-routing:enable,aws-gwlb-inspect:enable,aws-gwlb-overlay-routing:enable,aws-gwlb-associate-vpce:${aws_vpc_endpoint.workload1_gwlbe.id}@ethernet1/1.1,aws-gwlb-associate-vpce:${aws_vpc_endpoint.workload2_gwlbe.id}@ethernet1/1.2
   EOF
   )
 
