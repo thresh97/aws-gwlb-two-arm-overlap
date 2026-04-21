@@ -46,11 +46,25 @@ provider "scm" {
 }
 
 locals {
-  folder        = var.dgname
-  trust_iface   = replace(var.panos_trust_iface, "ethernet", "")
-  untrust_iface = replace(var.panos_untrust_iface, "ethernet", "")
-  subif_vpc1    = replace(var.panos_subif_vpc1, "ethernet", "")
-  subif_vpc2    = replace(var.panos_subif_vpc2, "ethernet", "")
+  folder = var.dgname
+}
+
+# ---------------------------------------------------------------------------
+# Interface variables
+# ---------------------------------------------------------------------------
+
+resource "scm_variable" "eth_local" {
+  name   = "eth-local"
+  folder = local.folder
+  type   = "interface"
+  value  = var.panos_trust_iface
+}
+
+resource "scm_variable" "eth_internet" {
+  name   = "eth-internet"
+  folder = local.folder
+  type   = "interface"
+  value  = var.panos_untrust_iface
 }
 
 # ---------------------------------------------------------------------------
@@ -70,7 +84,7 @@ resource "scm_interface_management_profile" "gwlb" {
 # ---------------------------------------------------------------------------
 
 resource "scm_ethernet_interface" "trust" {
-  name   = local.trust_iface
+  name   = "$eth-local"
   folder = local.folder
 
   layer3 = {
@@ -81,10 +95,12 @@ resource "scm_ethernet_interface" "trust" {
     }
     interface_management_profile = scm_interface_management_profile.gwlb.name
   }
+
+  depends_on = [scm_variable.eth_local]
 }
 
 resource "scm_ethernet_interface" "untrust" {
-  name   = local.untrust_iface
+  name   = "$eth-internet"
   folder = local.folder
 
   layer3 = {
@@ -93,6 +109,8 @@ resource "scm_ethernet_interface" "untrust" {
       create_default_route = true
     }
   }
+
+  depends_on = [scm_variable.eth_internet]
 }
 
 # ---------------------------------------------------------------------------
@@ -100,19 +118,23 @@ resource "scm_ethernet_interface" "untrust" {
 # ---------------------------------------------------------------------------
 
 resource "scm_layer3_subinterface" "vpc1" {
-  name             = local.subif_vpc1
-  parent_interface = local.trust_iface
+  name             = "$eth-local.1"
+  parent_interface = "$eth-local"
   folder           = local.folder
   tag              = 1
   dhcp_client      = { create_default_route = false }
+
+  depends_on = [scm_ethernet_interface.trust]
 }
 
 resource "scm_layer3_subinterface" "vpc2" {
-  name             = local.subif_vpc2
-  parent_interface = local.trust_iface
+  name             = "$eth-local.2"
+  parent_interface = "$eth-local"
   folder           = local.folder
   tag              = 2
   dhcp_client      = { create_default_route = false }
+
+  depends_on = [scm_ethernet_interface.trust]
 }
 
 # ---------------------------------------------------------------------------
@@ -123,7 +145,7 @@ resource "scm_zone" "trust" {
   name   = var.panos_zone_trust
   folder = local.folder
   network = {
-    layer3 = [scm_ethernet_interface.trust.name]
+    layer3 = ["$eth-local"]
   }
   depends_on = [scm_ethernet_interface.trust]
 }
@@ -132,7 +154,7 @@ resource "scm_zone" "workload1" {
   name   = var.panos_zone_vpc1
   folder = local.folder
   network = {
-    layer3 = [scm_layer3_subinterface.vpc1.name]
+    layer3 = ["$eth-local.1"]
   }
   depends_on = [scm_layer3_subinterface.vpc1]
 }
@@ -141,7 +163,7 @@ resource "scm_zone" "workload2" {
   name   = var.panos_zone_vpc2
   folder = local.folder
   network = {
-    layer3 = [scm_layer3_subinterface.vpc2.name]
+    layer3 = ["$eth-local.2"]
   }
   depends_on = [scm_layer3_subinterface.vpc2]
 }
@@ -150,7 +172,7 @@ resource "scm_zone" "public" {
   name   = var.panos_zone_untrust
   folder = local.folder
   network = {
-    layer3 = [scm_ethernet_interface.untrust.name]
+    layer3 = ["$eth-internet"]
   }
   depends_on = [scm_ethernet_interface.untrust]
 }
@@ -252,7 +274,7 @@ resource "scm_nat_rule" "workload_egress_snat" {
   source_translation = {
     dynamic_ip_and_port = {
       interface_address = {
-        interface = local.untrust_iface
+        interface = "$eth-internet"
       }
     }
   }
