@@ -1,38 +1,41 @@
 # =============================================================================
 # SCM Provider - PAN-OS policy configuration via Strata Cloud Manager
 #
-# Manages the SCM folder (var.dgname) with policy-layer objects:
-#   - Interface management profile (GWLB health check)
-#   - Security zones (logical policy labels)
-#   - Logical router LR_default with static routes
-#   - Address object for 10/8
-#   - Security rules (per-workload-zone for differentiated policy)
-#   - NAT rule (interface SNAT)
+# Set enable_scm = true to manage PAN-OS config via SCM Terraform provider.
+# When enabled, all resources are created in the SCM folder (var.dgname) and
+# a candidate commit is triggered before the VM-Series instance is created.
 #
-# NOT managed here:
-#   - Interface-to-zone binding → panos_set_commands output
-#   - Interface-to-LR binding → panos_set_commands output
-#   - VPCE-to-sub-interface associations → EC2 user-data plugin-op-commands
+# Set enable_scm = false to skip SCM management entirely and apply config
+# manually via panos_set_commands output or the PAN-OS Terraform provider.
 # =============================================================================
 
 # ---------------------------------------------------------------------------
-# SCM provider variables
+# SCM toggle and credentials
 # ---------------------------------------------------------------------------
+
+variable "enable_scm" {
+  type        = bool
+  default     = true
+  description = "Enable SCM Terraform provider management of PAN-OS config"
+}
 
 variable "scm_client_id" {
   type        = string
-  description = "SCM service account OAuth2 client ID"
+  default     = ""
+  description = "SCM service account OAuth2 client ID (required when enable_scm = true)"
 }
 
 variable "scm_client_secret" {
   type        = string
+  default     = ""
   sensitive   = true
-  description = "SCM service account OAuth2 client secret"
+  description = "SCM service account OAuth2 client secret (required when enable_scm = true)"
 }
 
 variable "scm_scope" {
   type        = string
-  description = "SCM OAuth2 scope (format: tsg_id:XXXXXXXXXX)"
+  default     = ""
+  description = "SCM OAuth2 scope (format: tsg_id:XXXXXXXXXX) (required when enable_scm = true)"
 }
 
 # ---------------------------------------------------------------------------
@@ -54,6 +57,7 @@ locals {
 # ---------------------------------------------------------------------------
 
 resource "scm_interface_management_profile" "gwlb" {
+  count  = var.enable_scm ? 1 : 0
   name   = "gwlb"
   folder = local.folder
 
@@ -66,6 +70,7 @@ resource "scm_interface_management_profile" "gwlb" {
 # ---------------------------------------------------------------------------
 
 resource "scm_ethernet_interface" "trust" {
+  count         = var.enable_scm ? 1 : 0
   name          = "$eth-data"
   default_value = var.panos_trust_iface
   folder        = local.folder
@@ -76,11 +81,14 @@ resource "scm_ethernet_interface" "trust" {
       create_default_route = false
       send_hostname        = { enable = false }
     }
-    interface_management_profile = scm_interface_management_profile.gwlb.name
+    interface_management_profile = "gwlb"
   }
+
+  depends_on = [scm_interface_management_profile.gwlb]
 }
 
 resource "scm_ethernet_interface" "untrust" {
+  count         = var.enable_scm ? 1 : 0
   name          = "$eth-public"
   default_value = var.panos_untrust_iface
   folder        = local.folder
@@ -98,6 +106,7 @@ resource "scm_ethernet_interface" "untrust" {
 # ---------------------------------------------------------------------------
 
 resource "scm_layer3_subinterface" "vpc1" {
+  count            = var.enable_scm ? 1 : 0
   name             = "$eth-data.1"
   parent_interface = "$eth-data"
   folder           = local.folder
@@ -108,6 +117,7 @@ resource "scm_layer3_subinterface" "vpc1" {
 }
 
 resource "scm_layer3_subinterface" "vpc2" {
+  count            = var.enable_scm ? 1 : 0
   name             = "$eth-data.2"
   parent_interface = "$eth-data"
   folder           = local.folder
@@ -122,6 +132,7 @@ resource "scm_layer3_subinterface" "vpc2" {
 # ---------------------------------------------------------------------------
 
 resource "scm_zone" "trust" {
+  count  = var.enable_scm ? 1 : 0
   name   = var.panos_zone_trust
   folder = local.folder
   network = {
@@ -131,6 +142,7 @@ resource "scm_zone" "trust" {
 }
 
 resource "scm_zone" "workload1" {
+  count  = var.enable_scm ? 1 : 0
   name   = var.panos_zone_vpc1
   folder = local.folder
   network = {
@@ -140,6 +152,7 @@ resource "scm_zone" "workload1" {
 }
 
 resource "scm_zone" "workload2" {
+  count  = var.enable_scm ? 1 : 0
   name   = var.panos_zone_vpc2
   folder = local.folder
   network = {
@@ -149,6 +162,7 @@ resource "scm_zone" "workload2" {
 }
 
 resource "scm_zone" "public" {
+  count  = var.enable_scm ? 1 : 0
   name   = var.panos_zone_untrust
   folder = local.folder
   network = {
@@ -162,6 +176,7 @@ resource "scm_zone" "public" {
 # ---------------------------------------------------------------------------
 
 resource "scm_address" "rfc1918_10" {
+  count      = var.enable_scm ? 1 : 0
   name       = "10.0.0.0_8"
   folder     = local.folder
   ip_netmask = "10.0.0.0/8"
@@ -172,6 +187,7 @@ resource "scm_address" "rfc1918_10" {
 # ---------------------------------------------------------------------------
 
 resource "scm_logical_router" "main" {
+  count  = var.enable_scm ? 1 : 0
   name   = "LR_default"
   folder = local.folder
 
@@ -215,35 +231,41 @@ resource "scm_logical_router" "main" {
 # ---------------------------------------------------------------------------
 
 resource "scm_security_rule" "workload1_to_internet" {
+  count  = var.enable_scm ? 1 : 0
   name   = "${var.panos_zone_vpc1}-to-internet"
   folder = local.folder
 
   from               = [var.panos_zone_vpc1]
   to                 = [var.panos_zone_untrust]
-  source             = [scm_address.rfc1918_10.name]
-  destination        = [scm_address.rfc1918_10.name]
+  source             = ["10.0.0.0_8"]
+  destination        = ["10.0.0.0_8"]
   negate_destination = true
   source_user        = ["any"]
   category           = ["any"]
   application        = ["any"]
   service            = ["any"]
   action             = "allow"
+
+  depends_on = [scm_address.rfc1918_10]
 }
 
 resource "scm_security_rule" "workload2_to_internet" {
+  count  = var.enable_scm ? 1 : 0
   name   = "${var.panos_zone_vpc2}-to-internet"
   folder = local.folder
 
   from               = [var.panos_zone_vpc2]
   to                 = [var.panos_zone_untrust]
-  source             = [scm_address.rfc1918_10.name]
-  destination        = [scm_address.rfc1918_10.name]
+  source             = ["10.0.0.0_8"]
+  destination        = ["10.0.0.0_8"]
   negate_destination = true
   source_user        = ["any"]
   category           = ["any"]
   application        = ["any"]
   service            = ["any"]
   action             = "allow"
+
+  depends_on = [scm_address.rfc1918_10]
 }
 
 # ---------------------------------------------------------------------------
@@ -251,12 +273,13 @@ resource "scm_security_rule" "workload2_to_internet" {
 # ---------------------------------------------------------------------------
 
 resource "scm_nat_rule" "workload_egress_snat" {
+  count  = var.enable_scm ? 1 : 0
   name   = "workload-egress-snat"
   folder = local.folder
 
   from        = [var.panos_zone_vpc1, var.panos_zone_vpc2]
   to          = [var.panos_zone_untrust]
-  source      = [scm_address.rfc1918_10.name]
+  source      = ["10.0.0.0_8"]
   destination = ["any"]
   service     = "any"
 
@@ -267,31 +290,35 @@ resource "scm_nat_rule" "workload_egress_snat" {
       }
     }
   }
+
+  depends_on = [scm_address.rfc1918_10]
 }
 
 # ---------------------------------------------------------------------------
-# SCM commit and push
+# SCM commit
 # Commits candidate config before VM-Series boots.
 # The firewall pulls the committed config when it registers with SCM.
 # aws_instance.vmseries depends on this resource.
 # ---------------------------------------------------------------------------
 
 resource "null_resource" "scm_commit" {
+  count = var.enable_scm ? 1 : 0
+
   triggers = {
-    iface_trust    = scm_ethernet_interface.trust.id
-    iface_untrust  = scm_ethernet_interface.untrust.id
-    subif_vpc1     = scm_layer3_subinterface.vpc1.id
-    subif_vpc2     = scm_layer3_subinterface.vpc2.id
-    zone_trust     = scm_zone.trust.id
-    zone_workload1 = scm_zone.workload1.id
-    zone_workload2 = scm_zone.workload2.id
-    zone_public    = scm_zone.public.id
-    address        = scm_address.rfc1918_10.id
-    logical_router = scm_logical_router.main.id
-    rule_vpc1      = scm_security_rule.workload1_to_internet.id
-    rule_vpc2      = scm_security_rule.workload2_to_internet.id
-    nat_rule       = scm_nat_rule.workload_egress_snat.id
-    mgmt_profile   = scm_interface_management_profile.gwlb.id
+    iface_trust    = one(scm_ethernet_interface.trust[*].id)
+    iface_untrust  = one(scm_ethernet_interface.untrust[*].id)
+    subif_vpc1     = one(scm_layer3_subinterface.vpc1[*].id)
+    subif_vpc2     = one(scm_layer3_subinterface.vpc2[*].id)
+    zone_trust     = one(scm_zone.trust[*].id)
+    zone_workload1 = one(scm_zone.workload1[*].id)
+    zone_workload2 = one(scm_zone.workload2[*].id)
+    zone_public    = one(scm_zone.public[*].id)
+    address        = one(scm_address.rfc1918_10[*].id)
+    logical_router = one(scm_logical_router.main[*].id)
+    rule_vpc1      = one(scm_security_rule.workload1_to_internet[*].id)
+    rule_vpc2      = one(scm_security_rule.workload2_to_internet[*].id)
+    nat_rule       = one(scm_nat_rule.workload_egress_snat[*].id)
+    mgmt_profile   = one(scm_interface_management_profile.gwlb[*].id)
   }
 
   provisioner "local-exec" {

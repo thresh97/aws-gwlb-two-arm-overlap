@@ -15,7 +15,8 @@ pin_id          = "your-pin-id"
 pin_value       = "your-pin-value"
 authcodes       = "YOUR-AUTHCODE"
 
-# SCM Terraform provider credentials
+# SCM Terraform provider (set enable_scm = false to skip)
+enable_scm        = true
 scm_client_id     = "your-client-id"
 scm_client_secret = "your-client-secret"
 scm_scope         = "tsg_id:XXXXXXXXXX"
