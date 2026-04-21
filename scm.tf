@@ -262,7 +262,8 @@ resource "scm_nat_rule" "workload_egress_snat" {
 
 # ---------------------------------------------------------------------------
 # SCM commit and push
-# Commits candidate config and pushes to the folder before VM-Series boots.
+# Commits candidate config before VM-Series boots.
+# The firewall pulls the committed config when it registers with SCM.
 # aws_instance.vmseries depends on this resource.
 # ---------------------------------------------------------------------------
 
@@ -303,7 +304,7 @@ resource "null_resource" "scm_commit" {
         | jq -r '.access_token')
 
       curl -sf -X POST \
-        "https://api.sase.paloaltonetworks.com/sse/config/v1/config-versions/candidate:push" \
+        "https://api.sase.paloaltonetworks.com/sse/config/v1/config-versions/candidate:commit" \
         -H "Authorization: Bearer $TOKEN" \
         -H "Content-Type: application/json" \
         -d "{\"folders\":[\"$FOLDER\"],\"description\":\"Terraform apply\"}"
