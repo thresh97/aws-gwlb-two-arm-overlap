@@ -66,7 +66,7 @@ resource "scm_interface_management_profile" "gwlb" {
 # ---------------------------------------------------------------------------
 
 resource "scm_ethernet_interface" "trust" {
-  name          = "$eth-local"
+  name          = "$eth-data"
   default_value = var.panos_trust_iface
   folder        = local.folder
 
@@ -81,7 +81,7 @@ resource "scm_ethernet_interface" "trust" {
 }
 
 resource "scm_ethernet_interface" "untrust" {
-  name          = "$eth-internet"
+  name          = "$eth-public"
   default_value = var.panos_untrust_iface
   folder        = local.folder
 
@@ -98,8 +98,8 @@ resource "scm_ethernet_interface" "untrust" {
 # ---------------------------------------------------------------------------
 
 resource "scm_layer3_subinterface" "vpc1" {
-  name             = "$eth-local.1"
-  parent_interface = "$eth-local"
+  name             = "$eth-data.1"
+  parent_interface = "$eth-data"
   folder           = local.folder
   tag              = 1
   dhcp_client      = { create_default_route = false }
@@ -108,8 +108,8 @@ resource "scm_layer3_subinterface" "vpc1" {
 }
 
 resource "scm_layer3_subinterface" "vpc2" {
-  name             = "$eth-local.2"
-  parent_interface = "$eth-local"
+  name             = "$eth-data.2"
+  parent_interface = "$eth-data"
   folder           = local.folder
   tag              = 2
   dhcp_client      = { create_default_route = false }
@@ -125,7 +125,7 @@ resource "scm_zone" "trust" {
   name   = var.panos_zone_trust
   folder = local.folder
   network = {
-    layer3 = ["$eth-local"]
+    layer3 = ["$eth-data"]
   }
   depends_on = [scm_ethernet_interface.trust]
 }
@@ -134,7 +134,7 @@ resource "scm_zone" "workload1" {
   name   = var.panos_zone_vpc1
   folder = local.folder
   network = {
-    layer3 = ["$eth-local.1"]
+    layer3 = ["$eth-data.1"]
   }
   depends_on = [scm_layer3_subinterface.vpc1]
 }
@@ -143,7 +143,7 @@ resource "scm_zone" "workload2" {
   name   = var.panos_zone_vpc2
   folder = local.folder
   network = {
-    layer3 = ["$eth-local.2"]
+    layer3 = ["$eth-data.2"]
   }
   depends_on = [scm_layer3_subinterface.vpc2]
 }
@@ -152,7 +152,7 @@ resource "scm_zone" "public" {
   name   = var.panos_zone_untrust
   folder = local.folder
   network = {
-    layer3 = ["$eth-internet"]
+    layer3 = ["$eth-public"]
   }
   depends_on = [scm_ethernet_interface.untrust]
 }
@@ -254,7 +254,7 @@ resource "scm_nat_rule" "workload_egress_snat" {
   source_translation = {
     dynamic_ip_and_port = {
       interface_address = {
-        interface = "$eth-internet"
+        interface = "$eth-public"
       }
     }
   }
