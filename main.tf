@@ -141,7 +141,7 @@ variable "panos_router_type" {
 
 variable "panos_vr" {
   type        = string
-  default     = "default"
+  default     = "LR_default"
   description = "PAN-OS virtual/logical router name"
 }
 
