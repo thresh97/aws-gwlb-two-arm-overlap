@@ -1,5 +1,7 @@
 # AWS VM-Series GWLB — Two-Arm Overlay Routing with Overlapping CIDRs
 
+> **Disclaimer:** Lab and demonstration use only. Not validated for production. No warranty expressed or implied. See full disclaimer below.
+
 Single-AZ centralized egress deployment demonstrating VM-Series inspection via AWS Gateway Load Balancer across two workload VPCs with identical CIDRs and identical workload IPs — a capability of GWLB two-arm overlay routing that traditional routing cannot achieve.
 
 ---
@@ -136,4 +138,15 @@ Both workload VPCs use `10.0.0.0/16`, and both workload VMs are statically assig
 
 ## Disclaimer
 
-Lab/demo use only. Not validated for production.
+> **This repository is provided for lab and demonstration purposes only.**
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+**This deployment:**
+- Is not validated for production use
+- Has not undergone security review
+- Deploys permissive security rules intended only for traffic flow validation
+- May incur AWS costs — VM-Series (m5.xlarge) and GWLB are not free-tier resources; destroy when not in use
+- Requires acceptance of Palo Alto Networks VM-Series Marketplace terms in your AWS account
+
+MIT License — Copyright (c) 2026

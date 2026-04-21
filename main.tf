@@ -111,6 +111,75 @@ variable "workload_instance_type" {
 }
 
 # ---------------------------------------------------------------------------
+# PAN-OS config generation (optional)
+# ---------------------------------------------------------------------------
+
+variable "generate_panos_config" {
+  type        = bool
+  default     = false
+  description = "Render panos_set_commands output with VM-Series configure-mode set CLI"
+}
+
+variable "panos_router_type" {
+  type        = string
+  default     = "logical-router"
+  description = "PAN-OS router type: virtual-router or logical-router"
+
+  validation {
+    condition     = contains(["virtual-router", "logical-router"], var.panos_router_type)
+    error_message = "Must be virtual-router or logical-router."
+  }
+}
+
+variable "panos_vr" {
+  type        = string
+  default     = "default"
+  description = "PAN-OS virtual/logical router name"
+}
+
+variable "panos_trust_iface" {
+  type        = string
+  default     = "ethernet1/1"
+  description = "PAN-OS trust/private interface (ENI0 with mgmt-interface-swap)"
+}
+
+variable "panos_untrust_iface" {
+  type        = string
+  default     = "ethernet1/2"
+  description = "PAN-OS untrust/public interface (ENI2 with mgmt-interface-swap)"
+}
+
+variable "panos_subif_vpc1" {
+  type        = string
+  default     = "ethernet1/1.1"
+  description = "PAN-OS sub-interface for Workload VPC 1 GWLBE association"
+}
+
+variable "panos_subif_vpc2" {
+  type        = string
+  default     = "ethernet1/1.2"
+  description = "PAN-OS sub-interface for Workload VPC 2 GWLBE association"
+}
+
+variable "panos_zone_untrust" {
+  type        = string
+  default     = "untrust"
+  description = "PAN-OS untrust/public security zone"
+}
+
+variable "panos_zone_vpc1" {
+  type        = string
+  default     = "workload-vpc-1"
+  description = "PAN-OS security zone for Workload VPC 1 traffic"
+}
+
+variable "panos_zone_vpc2" {
+  type        = string
+  default     = "workload-vpc-2"
+  description = "PAN-OS security zone for Workload VPC 2 traffic"
+}
+
+# ---------------------------------------------------------------------------
 # AMI Lookup — VM-Series BYOL
 # ---------------------------------------------------------------------------
 
@@ -788,4 +857,85 @@ output "workload1_vm_eip" {
 output "workload2_vm_eip" {
   description = "Workload VPC 2 test VM public IP"
   value       = aws_eip.workload2.public_ip
+}
+
+# ---------------------------------------------------------------------------
+# Optional PAN-OS set command macro
+# Set generate_panos_config = true to populate
+# terraform output -raw panos_set_commands
+# ---------------------------------------------------------------------------
+
+output "panos_set_commands" {
+  description = "VM-Series configure-mode set commands for GWLB two-arm overlay routing"
+  value = !var.generate_panos_config ? null : <<-EOT
+
+    # ==========================================================
+    # VM-Series — AWS GWLB Two-Arm Overlay Routing
+    # Paste in configure mode, then commit
+    # ==========================================================
+
+    # --- Interfaces ---
+    # Untrust (ENI2): DHCP, learns default route
+    set network interface ethernet ${var.panos_untrust_iface} layer3 dhcp-client create-default-route yes
+    set network interface ethernet ${var.panos_untrust_iface} layer3 dhcp-client enable yes
+
+    # Trust (ENI0): DHCP, no default route
+    set network interface ethernet ${var.panos_trust_iface} layer3 dhcp-client create-default-route no
+    set network interface ethernet ${var.panos_trust_iface} layer3 dhcp-client enable yes
+
+    # Sub-interface for Workload VPC 1 (GWLBE association via user-data)
+    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc1} tag 1
+    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc1} adjust-tcp-mss ipv4-mss-adjustment 150
+    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc1} dhcp-client create-default-route no
+    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc1} dhcp-client enable yes
+
+    # Sub-interface for Workload VPC 2 (GWLBE association via user-data)
+    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc2} tag 2
+    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc2} adjust-tcp-mss ipv4-mss-adjustment 150
+    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc2} dhcp-client create-default-route no
+    set network interface ethernet ${var.panos_trust_iface} layer3 units ${var.panos_subif_vpc2} dhcp-client enable yes
+
+    # --- Security zones ---
+    set zone ${var.panos_zone_untrust} network layer3 ${var.panos_untrust_iface}
+    set zone ${var.panos_zone_vpc1} network layer3 ${var.panos_subif_vpc1}
+    set zone ${var.panos_zone_vpc2} network layer3 ${var.panos_subif_vpc2}
+
+    # --- Virtual/logical router ---
+    set network ${var.panos_router_type} ${var.panos_vr} interface ${var.panos_untrust_iface}
+    set network ${var.panos_router_type} ${var.panos_vr} interface ${var.panos_trust_iface}
+    set network ${var.panos_router_type} ${var.panos_vr} interface ${var.panos_subif_vpc1}
+    set network ${var.panos_router_type} ${var.panos_vr} interface ${var.panos_subif_vpc2}
+
+    # --- Static route — overlapping workload VPC CIDR via trust subnet DGW ---
+    # Enables return path routing for workload traffic; overlay routing uses
+    # GWLB endpoint ID (not dest IP) to determine egress sub-interface
+    set network ${var.panos_router_type} ${var.panos_vr} routing-table ip static-route workload-vpc-overlap destination 10.0.0.0/16 nexthop ip-address ${cidrhost("172.16.2.0/24", 1)}
+
+    # --- Security policies ---
+    # Workload VPC 1 → untrust (internet egress)
+    set rulebase security rules vpc1-to-internet from ${var.panos_zone_vpc1}
+    set rulebase security rules vpc1-to-internet to ${var.panos_zone_untrust}
+    set rulebase security rules vpc1-to-internet source any
+    set rulebase security rules vpc1-to-internet destination any
+    set rulebase security rules vpc1-to-internet application any
+    set rulebase security rules vpc1-to-internet service any
+    set rulebase security rules vpc1-to-internet action allow
+
+    # Workload VPC 2 → untrust (internet egress)
+    set rulebase security rules vpc2-to-internet from ${var.panos_zone_vpc2}
+    set rulebase security rules vpc2-to-internet to ${var.panos_zone_untrust}
+    set rulebase security rules vpc2-to-internet source any
+    set rulebase security rules vpc2-to-internet destination any
+    set rulebase security rules vpc2-to-internet application any
+    set rulebase security rules vpc2-to-internet service any
+    set rulebase security rules vpc2-to-internet action allow
+
+    # --- NAT policy — interface SNAT for both workload zones ---
+    set rulebase nat rules workload-egress-snat from [ ${var.panos_zone_vpc1} ${var.panos_zone_vpc2} ]
+    set rulebase nat rules workload-egress-snat to ${var.panos_zone_untrust}
+    set rulebase nat rules workload-egress-snat source any
+    set rulebase nat rules workload-egress-snat destination any
+    set rulebase nat rules workload-egress-snat service any
+    set rulebase nat rules workload-egress-snat source-translation dynamic-ip-and-port interface-address interface ${var.panos_untrust_iface}
+  EOT
 }
