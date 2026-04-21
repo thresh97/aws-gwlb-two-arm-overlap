@@ -440,9 +440,13 @@ resource "aws_network_interface" "mgmt" {
 }
 
 resource "aws_eip" "mgmt" {
-  domain               = "vpc"
+  domain = "vpc"
+  tags   = { Name = "${var.prefix}-vmseries-mgmt-eip" }
+}
+
+resource "aws_eip_association" "mgmt" {
+  allocation_id        = aws_eip.mgmt.id
   network_interface_id = aws_network_interface.mgmt.id
-  tags                 = { Name = "${var.prefix}-vmseries-mgmt-eip" }
 }
 
 # ENI2 — Untrust (eth2 with mgmt-interface-swap), gets EIP
@@ -454,9 +458,13 @@ resource "aws_network_interface" "untrust" {
 }
 
 resource "aws_eip" "untrust" {
-  domain               = "vpc"
+  domain = "vpc"
+  tags   = { Name = "${var.prefix}-vmseries-untrust-eip" }
+}
+
+resource "aws_eip_association" "untrust" {
+  allocation_id        = aws_eip.untrust.id
   network_interface_id = aws_network_interface.untrust.id
-  tags                 = { Name = "${var.prefix}-vmseries-untrust-eip" }
 }
 
 # ---------------------------------------------------------------------------
@@ -687,9 +695,13 @@ resource "aws_instance" "workload1" {
 }
 
 resource "aws_eip" "workload1" {
-  domain   = "vpc"
-  instance = aws_instance.workload1.id
-  tags     = { Name = "${var.prefix}-workload1-eip" }
+  domain = "vpc"
+  tags   = { Name = "${var.prefix}-workload1-eip" }
+}
+
+resource "aws_eip_association" "workload1" {
+  allocation_id = aws_eip.workload1.id
+  instance_id   = aws_instance.workload1.id
 }
 
 # ===========================================================================
@@ -815,9 +827,13 @@ resource "aws_instance" "workload2" {
 }
 
 resource "aws_eip" "workload2" {
-  domain   = "vpc"
-  instance = aws_instance.workload2.id
-  tags     = { Name = "${var.prefix}-workload2-eip" }
+  domain = "vpc"
+  tags   = { Name = "${var.prefix}-workload2-eip" }
+}
+
+resource "aws_eip_association" "workload2" {
+  allocation_id = aws_eip.workload2.id
+  instance_id   = aws_instance.workload2.id
 }
 
 # ===========================================================================
