@@ -25,6 +25,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    scm = {
+      source  = "PaloAltoNetworks/scm"
+      version = "1.0.9"
+    }
   }
 }
 

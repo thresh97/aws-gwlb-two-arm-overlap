@@ -15,6 +15,11 @@ pin_id          = "your-pin-id"
 pin_value       = "your-pin-value"
 authcodes       = "YOUR-AUTHCODE"
 
+# SCM Terraform provider credentials
+scm_client_id     = "your-client-id"
+scm_client_secret = "your-client-secret"
+scm_scope         = "tsg_id:XXXXXXXXXX"
+
 # Management access — used for SG rules and backdoor routes in workload VPCs
 mgmt_cidrs = ["203.0.113.0/24"]
 
