@@ -355,7 +355,7 @@ resource "null_resource" "scm_commit" {
         | jq -r '.access_token')
 
       RESPONSE=$(curl -s -w "\nHTTP_STATUS:%%{http_code}" -X POST \
-        "https://api.sase.paloaltonetworks.com/sse/config/v1/config-versions/candidate:commit" \
+        "https://api.sase.paloaltonetworks.com/config/v1/config-versions/candidate:commit" \
         -H "Authorization: Bearer $TOKEN" \
         -H "Content-Type: application/json" \
         -d "{\"folders\":[\"$FOLDER\"],\"description\":\"Terraform apply\"}")
