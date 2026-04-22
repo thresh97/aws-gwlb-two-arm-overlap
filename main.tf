@@ -583,7 +583,7 @@ resource "aws_instance" "vmseries" {
     dhcp-accept-server-hostname=yes
     dhcp-accept-server-domain=yes
     panorama-server=cloud
-    dgname=${var.dgname}
+    dgname=${local.folder}
     vm-series-auto-registration-pin-id=${var.pin_id}
     vm-series-auto-registration-pin-value=${var.pin_value}
     authcodes=${var.authcodes}
