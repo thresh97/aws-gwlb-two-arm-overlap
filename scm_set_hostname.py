@@ -109,7 +109,17 @@ def main():
     parser.add_argument("--folder",   required=True, help="SCM folder name")
     parser.add_argument("--serial",   default=None,  help="Device serial number (omit to list all)")
     parser.add_argument("--hostname", default=None,  help="Desired hostname (omit for read-only)")
+    parser.add_argument("--debug",    action="store_true", help="Dump HTTP request/response details")
     args = parser.parse_args()
+
+    if args.debug:
+        import logging
+        import http.client
+        http.client.HTTPSConnection.debuglevel = 1
+        logging.basicConfig(level=logging.DEBUG)
+        requests_log = logging.getLogger("urllib3")
+        requests_log.setLevel(logging.DEBUG)
+        requests_log.propagate = True
 
     client_id, client_secret, scope = get_creds()
     token = get_token(client_id, client_secret, scope)
