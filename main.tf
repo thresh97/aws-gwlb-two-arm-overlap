@@ -555,6 +555,9 @@ resource "aws_instance" "vmseries" {
 
   user_data = base64encode(<<-EOF
     mgmt-interface-swap=enable
+    type=dhcp-client
+    dhcp-accept-server-hostname=yes
+    dhcp-accept-server-domain=yes
     panorama-server=cloud
     dgname=${var.dgname}
     vm-series-auto-registration-pin-id=${var.pin_id}

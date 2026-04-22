@@ -111,6 +111,9 @@ The VM-Series is bootstrapped via EC2 user-data:
 
 ```
 mgmt-interface-swap=enable
+type=dhcp-client
+dhcp-accept-server-hostname=yes
+dhcp-accept-server-domain=yes
 panorama-server=cloud
 dgname=<var.dgname>
 vm-series-auto-registration-pin-id=<var.pin_id>
