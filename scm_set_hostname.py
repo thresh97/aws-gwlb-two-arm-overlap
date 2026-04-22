@@ -73,24 +73,28 @@ def get_token(client_id, client_secret, scope):
     return r.json()["access_token"]
 
 
+PANORAMA_BASE = "https://paas-12.prod.panorama.paloaltonetworks.com"
+
 DEVICE_ENDPOINTS = [
-    ("GET", f"{API_BASE}/sase/config/v1/folders",  {"parent": None, "limit": 200}),
-    ("GET", f"{API_BASE}/sse/config/v1/devices",   {"folder": None, "limit": 200}),
-    ("GET", f"{API_BASE}/sase/config/v1/devices",  {"folder": None, "limit": 200}),
+    f"{API_BASE}/sse/config/v1/devices",
+    f"{PANORAMA_BASE}/sase/config/v1/folders",
+    f"{API_BASE}/sase/config/v1/folders",
 ]
 
 
 def list_devices(token, folder, debug=False):
     headers = {"Authorization": f"Bearer {token}"}
-    for method, url, param_template in DEVICE_ENDPOINTS:
-        params = {k: (folder if v is None else v) for k, v in param_template.items()}
-        r = requests.get(url, headers=headers, params=params)
-        if debug:
-            print(f"  {method} {r.url} -> {r.status_code}")
-        if r.ok:
-            data = r.json()
-            return data if isinstance(data, list) else data.get("data", data.get("items", []))
-    print(f"ERROR: all device list endpoints failed. Last response: {r.status_code} {r.text}")
+    for url in DEVICE_ENDPOINTS:
+        for param_key in ("folder", "parent"):
+            params = {param_key: folder, "limit": 200}
+            r = requests.get(url, headers=headers, params=params)
+            if debug:
+                print(f"  GET {r.url} -> {r.status_code}")
+            if r.ok:
+                data = r.json()
+                return data if isinstance(data, list) else data.get("data", data.get("items", []))
+    print(f"ERROR: all device list endpoints failed. Last: {r.status_code} {r.text}")
+    print("Tip: pass --device-id <uuid> to skip discovery (find UUID in SCM UI).")
     sys.exit(1)
 
 
@@ -116,10 +120,11 @@ def set_hostname(token, device_id, serial, hostname):
 
 def main():
     parser = argparse.ArgumentParser(description="Read/set SCM device display_name")
-    parser.add_argument("--folder",   required=True, help="SCM folder name")
-    parser.add_argument("--serial",   default=None,  help="Device serial number (omit to list all)")
-    parser.add_argument("--hostname", default=None,  help="Desired hostname (omit for read-only)")
-    parser.add_argument("--debug",    action="store_true", help="Dump HTTP request/response details")
+    parser.add_argument("--folder",    required=True, help="SCM folder name")
+    parser.add_argument("--serial",    default=None,  help="Device serial number (omit to list all)")
+    parser.add_argument("--hostname",  default=None,  help="Desired hostname (omit for read-only)")
+    parser.add_argument("--device-id", default=None,  help="SCM device UUID (bypasses discovery; find in SCM UI)")
+    parser.add_argument("--debug",     action="store_true", help="Dump HTTP request/response details")
     args = parser.parse_args()
 
     if args.debug:
@@ -133,6 +138,17 @@ def main():
 
     client_id, client_secret, scope = get_creds()
     token = get_token(client_id, client_secret, scope)
+
+    # --- device-id shortcut: skip discovery ---
+    if args.device_id:
+        if not args.serial or not args.hostname:
+            print("ERROR: --device-id requires --serial and --hostname")
+            sys.exit(1)
+        print(f"Setting display_name via device-id {args.device_id}...")
+        set_hostname(token, args.device_id, args.serial, args.hostname)
+        print("Done.")
+        return
+
     items = list_devices(token, args.folder, debug=args.debug)
 
     # --- folder-only: dump table ---
