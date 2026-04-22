@@ -64,9 +64,9 @@ locals {
 
 resource "scm_folder" "main" {
   count       = var.enable_scm ? 1 : 0
-  name        = var.dgname
+  name        = local.folder
   parent      = var.scm_parent_folder
-  description = var.dgname
+  description = local.folder
 }
 
 # ---------------------------------------------------------------------------
