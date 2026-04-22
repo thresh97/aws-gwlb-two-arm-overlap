@@ -1,3 +1,5 @@
+# deploy_id = "abc"  # 3-char alphanumeric; random if not set
+
 region = "us-east-1"
 az     = "us-east-1a"
 prefix = "gwlb-demo"

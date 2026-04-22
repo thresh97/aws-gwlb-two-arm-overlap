@@ -55,7 +55,7 @@ variable "scm_parent_folder" {
 }
 
 locals {
-  folder = var.dgname
+  folder = "${local.deploy_id}-${var.dgname}"
 }
 
 # ---------------------------------------------------------------------------

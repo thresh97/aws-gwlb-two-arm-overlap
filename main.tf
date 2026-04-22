@@ -29,6 +29,10 @@ terraform {
       source  = "PaloAltoNetworks/scm"
       version = "1.0.9"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
   }
 }
 
@@ -220,12 +224,32 @@ data "aws_ami" "amazon_linux" {
 }
 
 resource "aws_key_pair" "main" {
-  key_name   = "${var.prefix}-key"
+  key_name   = "${local.prefix}-key"
   public_key = var.ssh_public_key
-  tags       = { Name = "${var.prefix}-key" }
+  tags       = { Name = "${local.prefix}-key" }
+}
+
+variable "deploy_id" {
+  type        = string
+  default     = null
+  description = "3-character alphanumeric deployment prefix. Randomly generated if not set."
+
+  validation {
+    condition     = var.deploy_id == null || can(regex("^[a-z0-9]{3}$", var.deploy_id))
+    error_message = "deploy_id must be exactly 3 lowercase alphanumeric characters."
+  }
+}
+
+resource "random_string" "deploy_id" {
+  count   = var.deploy_id == null ? 1 : 0
+  length  = 3
+  upper   = false
+  special = false
 }
 
 locals {
+  deploy_id    = var.deploy_id != null ? var.deploy_id : random_string.deploy_id[0].result
+  prefix       = "${local.deploy_id}-${var.prefix}"
   vmseries_ami = var.vm_series_ami_id != null ? var.vm_series_ami_id : data.aws_ami.vmseries[0].id
 }
 
@@ -237,12 +261,12 @@ resource "aws_vpc" "security" {
   cidr_block           = "172.16.0.0/16"
   enable_dns_support   = true
   enable_dns_hostnames = true
-  tags = { Name = "${var.prefix}-security-vpc" }
+  tags = { Name = "${local.prefix}-security-vpc" }
 }
 
 resource "aws_internet_gateway" "security" {
   vpc_id = aws_vpc.security.id
-  tags   = { Name = "${var.prefix}-security-igw" }
+  tags   = { Name = "${local.prefix}-security-igw" }
 }
 
 # ---------------------------------------------------------------------------
@@ -253,28 +277,28 @@ resource "aws_subnet" "mgmt" {
   vpc_id            = aws_vpc.security.id
   cidr_block        = "172.16.1.0/24"
   availability_zone = var.az
-  tags              = { Name = "${var.prefix}-mgmt-subnet" }
+  tags              = { Name = "${local.prefix}-mgmt-subnet" }
 }
 
 resource "aws_subnet" "trust" {
   vpc_id            = aws_vpc.security.id
   cidr_block        = "172.16.2.0/24"
   availability_zone = var.az
-  tags              = { Name = "${var.prefix}-trust-subnet" }
+  tags              = { Name = "${local.prefix}-trust-subnet" }
 }
 
 resource "aws_subnet" "untrust" {
   vpc_id            = aws_vpc.security.id
   cidr_block        = "172.16.3.0/24"
   availability_zone = var.az
-  tags              = { Name = "${var.prefix}-untrust-subnet" }
+  tags              = { Name = "${local.prefix}-untrust-subnet" }
 }
 
 resource "aws_subnet" "gwlb" {
   vpc_id            = aws_vpc.security.id
   cidr_block        = "172.16.4.0/24"
   availability_zone = var.az
-  tags              = { Name = "${var.prefix}-gwlb-subnet" }
+  tags              = { Name = "${local.prefix}-gwlb-subnet" }
 }
 
 # Reserved - no endpoint deployed, available for future use
@@ -282,7 +306,7 @@ resource "aws_subnet" "gwlbe_reserved" {
   vpc_id            = aws_vpc.security.id
   cidr_block        = "172.16.5.0/24"
   availability_zone = var.az
-  tags              = { Name = "${var.prefix}-gwlbe-reserved-subnet" }
+  tags              = { Name = "${local.prefix}-gwlbe-reserved-subnet" }
 }
 
 # ---------------------------------------------------------------------------
@@ -295,7 +319,7 @@ resource "aws_route_table" "mgmt" {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.security.id
   }
-  tags = { Name = "${var.prefix}-mgmt-rt" }
+  tags = { Name = "${local.prefix}-mgmt-rt" }
 }
 
 resource "aws_route_table_association" "mgmt" {
@@ -309,7 +333,7 @@ resource "aws_route_table" "untrust" {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.security.id
   }
-  tags = { Name = "${var.prefix}-untrust-rt" }
+  tags = { Name = "${local.prefix}-untrust-rt" }
 }
 
 resource "aws_route_table_association" "untrust" {
@@ -319,7 +343,7 @@ resource "aws_route_table_association" "untrust" {
 
 resource "aws_route_table" "trust" {
   vpc_id = aws_vpc.security.id
-  tags   = { Name = "${var.prefix}-trust-rt" }
+  tags   = { Name = "${local.prefix}-trust-rt" }
 }
 
 resource "aws_route_table_association" "trust" {
@@ -329,7 +353,7 @@ resource "aws_route_table_association" "trust" {
 
 resource "aws_route_table" "gwlb" {
   vpc_id = aws_vpc.security.id
-  tags   = { Name = "${var.prefix}-gwlb-rt" }
+  tags   = { Name = "${local.prefix}-gwlb-rt" }
 }
 
 resource "aws_route_table_association" "gwlb" {
@@ -343,7 +367,7 @@ resource "aws_route_table_association" "gwlb" {
 
 # Management - SSH, ICMP, HTTP, HTTPS from mgmt_cidrs
 resource "aws_security_group" "mgmt" {
-  name        = "${var.prefix}-vmseries-mgmt-sg"
+  name        = "${local.prefix}-vmseries-mgmt-sg"
   description = "VM-Series management interface"
   vpc_id      = aws_vpc.security.id
 
@@ -371,12 +395,12 @@ resource "aws_security_group" "mgmt" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = { Name = "${var.prefix}-vmseries-mgmt-sg" }
+  tags = { Name = "${local.prefix}-vmseries-mgmt-sg" }
 }
 
 # Trust - allow GENEVE (UDP 6081) from GWLB + all return traffic
 resource "aws_security_group" "trust" {
-  name        = "${var.prefix}-vmseries-trust-sg"
+  name        = "${local.prefix}-vmseries-trust-sg"
   description = "VM-Series trust interface - GWLB GENEVE traffic"
   vpc_id      = aws_vpc.security.id
 
@@ -403,12 +427,12 @@ resource "aws_security_group" "trust" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = { Name = "${var.prefix}-vmseries-trust-sg" }
+  tags = { Name = "${local.prefix}-vmseries-trust-sg" }
 }
 
 # Untrust - internet-facing data plane (egress only; return traffic is stateful)
 resource "aws_security_group" "untrust" {
-  name        = "${var.prefix}-vmseries-untrust-sg"
+  name        = "${local.prefix}-vmseries-untrust-sg"
   description = "VM-Series untrust interface"
   vpc_id      = aws_vpc.security.id
 
@@ -419,7 +443,7 @@ resource "aws_security_group" "untrust" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = { Name = "${var.prefix}-vmseries-untrust-sg" }
+  tags = { Name = "${local.prefix}-vmseries-untrust-sg" }
 }
 
 # ---------------------------------------------------------------------------
@@ -432,19 +456,19 @@ resource "aws_network_interface" "trust" {
   subnet_id         = aws_subnet.trust.id
   security_groups   = [aws_security_group.trust.id]
   source_dest_check = false # required for firewall data plane
-  tags              = { Name = "${var.prefix}-vmseries-trust-eni" }
+  tags              = { Name = "${local.prefix}-vmseries-trust-eni" }
 }
 
 # ENI1 - Management (eth1 with mgmt-interface-swap), gets EIP
 resource "aws_network_interface" "mgmt" {
   subnet_id       = aws_subnet.mgmt.id
   security_groups = [aws_security_group.mgmt.id]
-  tags            = { Name = "${var.prefix}-vmseries-mgmt-eni" }
+  tags            = { Name = "${local.prefix}-vmseries-mgmt-eni" }
 }
 
 resource "aws_eip" "mgmt" {
   domain = "vpc"
-  tags   = { Name = "${var.prefix}-vmseries-mgmt-eip" }
+  tags   = { Name = "${local.prefix}-vmseries-mgmt-eip" }
 }
 
 resource "aws_eip_association" "mgmt" {
@@ -456,12 +480,12 @@ resource "aws_eip_association" "mgmt" {
 resource "aws_network_interface" "untrust" {
   subnet_id       = aws_subnet.untrust.id
   security_groups = [aws_security_group.untrust.id]
-  tags            = { Name = "${var.prefix}-vmseries-untrust-eni" }
+  tags            = { Name = "${local.prefix}-vmseries-untrust-eni" }
 }
 
 resource "aws_eip" "untrust" {
   domain = "vpc"
-  tags   = { Name = "${var.prefix}-vmseries-untrust-eip" }
+  tags   = { Name = "${local.prefix}-vmseries-untrust-eip" }
 }
 
 resource "aws_eip_association" "untrust" {
@@ -474,14 +498,14 @@ resource "aws_eip_association" "untrust" {
 # ---------------------------------------------------------------------------
 
 resource "aws_lb" "gwlb" {
-  name               = "${var.prefix}-gwlb"
+  name               = "${local.prefix}-gwlb"
   load_balancer_type = "gateway"
   subnets            = [aws_subnet.gwlb.id]
-  tags               = { Name = "${var.prefix}-gwlb" }
+  tags               = { Name = "${local.prefix}-gwlb" }
 }
 
 resource "aws_lb_target_group" "vmseries" {
-  name        = "${var.prefix}-vmseries-tg"
+  name        = "${local.prefix}-vmseries-tg"
   port        = 6081
   protocol    = "GENEVE"
   vpc_id      = aws_vpc.security.id
@@ -496,7 +520,7 @@ resource "aws_lb_target_group" "vmseries" {
     unhealthy_threshold = 2
   }
 
-  tags = { Name = "${var.prefix}-vmseries-tg" }
+  tags = { Name = "${local.prefix}-vmseries-tg" }
 }
 
 resource "aws_lb_listener" "gwlb" {
@@ -522,7 +546,7 @@ resource "aws_lb_target_group_attachment" "vmseries" {
 resource "aws_vpc_endpoint_service" "gwlb" {
   acceptance_required        = false
   gateway_load_balancer_arns = [aws_lb.gwlb.arn]
-  tags                       = { Name = "${var.prefix}-gwlb-endpoint-service" }
+  tags                       = { Name = "${local.prefix}-gwlb-endpoint-service" }
 }
 
 # ---------------------------------------------------------------------------
@@ -575,7 +599,7 @@ resource "aws_instance" "vmseries" {
     ignore_changes = [user_data]
   }
 
-  tags = { Name = "${var.prefix}-vmseries" }
+  tags = { Name = "${local.prefix}-vmseries" }
 
   depends_on = [
     aws_vpc_endpoint.workload1_gwlbe,
@@ -595,26 +619,26 @@ resource "aws_vpc" "workload1" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_support   = true
   enable_dns_hostnames = true
-  tags = { Name = "${var.prefix}-workload1-vpc" }
+  tags = { Name = "${local.prefix}-workload1-vpc" }
 }
 
 resource "aws_internet_gateway" "workload1" {
   vpc_id = aws_vpc.workload1.id
-  tags   = { Name = "${var.prefix}-workload1-igw" }
+  tags   = { Name = "${local.prefix}-workload1-igw" }
 }
 
 resource "aws_subnet" "workload1_workload" {
   vpc_id            = aws_vpc.workload1.id
   cidr_block        = "10.0.1.0/24"
   availability_zone = var.az
-  tags              = { Name = "${var.prefix}-workload1-workload-subnet" }
+  tags              = { Name = "${local.prefix}-workload1-workload-subnet" }
 }
 
 resource "aws_subnet" "workload1_gwlbe" {
   vpc_id            = aws_vpc.workload1.id
   cidr_block        = "10.0.2.0/24"
   availability_zone = var.az
-  tags              = { Name = "${var.prefix}-workload1-gwlbe-subnet" }
+  tags              = { Name = "${local.prefix}-workload1-gwlbe-subnet" }
 }
 
 # GWLBE in Workload VPC 1
@@ -623,7 +647,7 @@ resource "aws_vpc_endpoint" "workload1_gwlbe" {
   service_name      = aws_vpc_endpoint_service.gwlb.service_name
   vpc_endpoint_type = "GatewayLoadBalancer"
   subnet_ids        = [aws_subnet.workload1_gwlbe.id]
-  tags              = { Name = "${var.prefix}-workload1-gwlbe" }
+  tags              = { Name = "${local.prefix}-workload1-gwlbe" }
 }
 
 # Workload VPC 1 route tables
@@ -645,7 +669,7 @@ resource "aws_route_table" "workload1_workload" {
     }
   }
 
-  tags = { Name = "${var.prefix}-workload1-workload-rt" }
+  tags = { Name = "${local.prefix}-workload1-workload-rt" }
 }
 
 resource "aws_route_table_association" "workload1_workload" {
@@ -659,7 +683,7 @@ resource "aws_route_table" "workload1_gwlbe" {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.workload1.id
   }
-  tags = { Name = "${var.prefix}-workload1-gwlbe-rt" }
+  tags = { Name = "${local.prefix}-workload1-gwlbe-rt" }
 }
 
 resource "aws_route_table_association" "workload1_gwlbe" {
@@ -669,7 +693,7 @@ resource "aws_route_table_association" "workload1_gwlbe" {
 
 # Workload VM 1
 resource "aws_security_group" "workload1" {
-  name        = "${var.prefix}-workload1-sg"
+  name        = "${local.prefix}-workload1-sg"
   description = "Workload 1 VM - management access"
   vpc_id      = aws_vpc.workload1.id
 
@@ -697,7 +721,7 @@ resource "aws_security_group" "workload1" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = { Name = "${var.prefix}-workload1-sg" }
+  tags = { Name = "${local.prefix}-workload1-sg" }
 }
 
 resource "aws_instance" "workload1" {
@@ -712,12 +736,12 @@ resource "aws_instance" "workload1" {
     volume_type = "gp3"
   }
 
-  tags = { Name = "${var.prefix}-workload1-vm" }
+  tags = { Name = "${local.prefix}-workload1-vm" }
 }
 
 resource "aws_eip" "workload1" {
   domain = "vpc"
-  tags   = { Name = "${var.prefix}-workload1-eip" }
+  tags   = { Name = "${local.prefix}-workload1-eip" }
 }
 
 resource "aws_eip_association" "workload1" {
@@ -734,26 +758,26 @@ resource "aws_vpc" "workload2" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_support   = true
   enable_dns_hostnames = true
-  tags = { Name = "${var.prefix}-workload2-vpc" }
+  tags = { Name = "${local.prefix}-workload2-vpc" }
 }
 
 resource "aws_internet_gateway" "workload2" {
   vpc_id = aws_vpc.workload2.id
-  tags   = { Name = "${var.prefix}-workload2-igw" }
+  tags   = { Name = "${local.prefix}-workload2-igw" }
 }
 
 resource "aws_subnet" "workload2_workload" {
   vpc_id            = aws_vpc.workload2.id
   cidr_block        = "10.0.1.0/24"
   availability_zone = var.az
-  tags              = { Name = "${var.prefix}-workload2-workload-subnet" }
+  tags              = { Name = "${local.prefix}-workload2-workload-subnet" }
 }
 
 resource "aws_subnet" "workload2_gwlbe" {
   vpc_id            = aws_vpc.workload2.id
   cidr_block        = "10.0.2.0/24"
   availability_zone = var.az
-  tags              = { Name = "${var.prefix}-workload2-gwlbe-subnet" }
+  tags              = { Name = "${local.prefix}-workload2-gwlbe-subnet" }
 }
 
 # GWLBE in Workload VPC 2
@@ -762,7 +786,7 @@ resource "aws_vpc_endpoint" "workload2_gwlbe" {
   service_name      = aws_vpc_endpoint_service.gwlb.service_name
   vpc_endpoint_type = "GatewayLoadBalancer"
   subnet_ids        = [aws_subnet.workload2_gwlbe.id]
-  tags              = { Name = "${var.prefix}-workload2-gwlbe" }
+  tags              = { Name = "${local.prefix}-workload2-gwlbe" }
 }
 
 # Workload VPC 2 route tables
@@ -782,7 +806,7 @@ resource "aws_route_table" "workload2_workload" {
     }
   }
 
-  tags = { Name = "${var.prefix}-workload2-workload-rt" }
+  tags = { Name = "${local.prefix}-workload2-workload-rt" }
 }
 
 resource "aws_route_table_association" "workload2_workload" {
@@ -796,7 +820,7 @@ resource "aws_route_table" "workload2_gwlbe" {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.workload2.id
   }
-  tags = { Name = "${var.prefix}-workload2-gwlbe-rt" }
+  tags = { Name = "${local.prefix}-workload2-gwlbe-rt" }
 }
 
 resource "aws_route_table_association" "workload2_gwlbe" {
@@ -806,7 +830,7 @@ resource "aws_route_table_association" "workload2_gwlbe" {
 
 # Workload VM 2
 resource "aws_security_group" "workload2" {
-  name        = "${var.prefix}-workload2-sg"
+  name        = "${local.prefix}-workload2-sg"
   description = "Workload 2 VM - management access"
   vpc_id      = aws_vpc.workload2.id
 
@@ -834,7 +858,7 @@ resource "aws_security_group" "workload2" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = { Name = "${var.prefix}-workload2-sg" }
+  tags = { Name = "${local.prefix}-workload2-sg" }
 }
 
 resource "aws_instance" "workload2" {
@@ -849,12 +873,12 @@ resource "aws_instance" "workload2" {
     volume_type = "gp3"
   }
 
-  tags = { Name = "${var.prefix}-workload2-vm" }
+  tags = { Name = "${local.prefix}-workload2-vm" }
 }
 
 resource "aws_eip" "workload2" {
   domain = "vpc"
-  tags   = { Name = "${var.prefix}-workload2-eip" }
+  tags   = { Name = "${local.prefix}-workload2-eip" }
 }
 
 resource "aws_eip_association" "workload2" {
