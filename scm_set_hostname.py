@@ -73,15 +73,25 @@ def get_token(client_id, client_secret, scope):
     return r.json()["access_token"]
 
 
-def list_devices(token, folder):
+DEVICE_ENDPOINTS = [
+    ("GET", f"{API_BASE}/sase/config/v1/folders",  {"parent": None, "limit": 200}),
+    ("GET", f"{API_BASE}/sse/config/v1/devices",   {"folder": None, "limit": 200}),
+    ("GET", f"{API_BASE}/sase/config/v1/devices",  {"folder": None, "limit": 200}),
+]
+
+
+def list_devices(token, folder, debug=False):
     headers = {"Authorization": f"Bearer {token}"}
-    params  = {"folder": folder, "limit": 200}
-    r = requests.get(f"{API_BASE}/sase/config/v1/folders", headers=headers, params=params)
-    if not r.ok:
-        print(f"GET /sase/config/v1/folders failed: {r.status_code} {r.text}")
-        sys.exit(1)
-    data = r.json()
-    return data if isinstance(data, list) else data.get("data", data.get("items", []))
+    for method, url, param_template in DEVICE_ENDPOINTS:
+        params = {k: (folder if v is None else v) for k, v in param_template.items()}
+        r = requests.get(url, headers=headers, params=params)
+        if debug:
+            print(f"  {method} {r.url} -> {r.status_code}")
+        if r.ok:
+            data = r.json()
+            return data if isinstance(data, list) else data.get("data", data.get("items", []))
+    print(f"ERROR: all device list endpoints failed. Last response: {r.status_code} {r.text}")
+    sys.exit(1)
 
 
 def find_device(items, serial):
@@ -123,7 +133,7 @@ def main():
 
     client_id, client_secret, scope = get_creds()
     token = get_token(client_id, client_secret, scope)
-    items = list_devices(token, args.folder)
+    items = list_devices(token, args.folder, debug=args.debug)
 
     # --- folder-only: dump table ---
     if args.serial is None:
