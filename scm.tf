@@ -118,6 +118,8 @@ resource "scm_ethernet_interface" "untrust" {
       create_default_route = true
     }
   }
+
+  depends_on = [scm_folder.main]
 }
 
 # ---------------------------------------------------------------------------
@@ -199,6 +201,8 @@ resource "scm_address" "rfc1918_10" {
   name       = "10.0.0.0_8"
   folder     = local.folder
   ip_netmask = "10.0.0.0/8"
+
+  depends_on = [scm_folder.main]
 }
 
 # ---------------------------------------------------------------------------

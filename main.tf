@@ -580,6 +580,9 @@ resource "aws_instance" "vmseries" {
   depends_on = [
     aws_vpc_endpoint.workload1_gwlbe,
     aws_vpc_endpoint.workload2_gwlbe,
+    scm_security_rule.workload1_to_internet,
+    scm_security_rule.workload2_to_internet,
+    scm_nat_rule.workload_egress_snat,
   ]
 }
 
