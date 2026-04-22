@@ -2,10 +2,9 @@
 """
 scm_set_hostname.py — Read and optionally set a device display_name in SCM.
 
-Credentials are read from environment variables:
-    SCM_CLIENT_ID      OAuth2 client ID
-    SCM_CLIENT_SECRET  OAuth2 client secret
-    SCM_SCOPE          OAuth2 scope (e.g. tsg_id:1234567890)
+Credentials are read from environment variables (SCM_CLIENT_ID, SCM_CLIENT_SECRET,
+SCM_SCOPE) or from terraform.tfvars in the current directory. Environment variables
+take precedence.
 
 Usage:
     # List all devices in a folder (serial / hostname table)
@@ -23,11 +22,44 @@ Requirements:
 
 import argparse
 import os
+import re
 import sys
 import requests
 
 AUTH_URL = "https://auth.apps.paloaltonetworks.com/auth/v1/oauth2/access_token"
 API_BASE = "https://api.sase.paloaltonetworks.com"
+TFVARS   = "terraform.tfvars"
+
+TFVAR_KEYS = {
+    "SCM_CLIENT_ID":     "scm_client_id",
+    "SCM_CLIENT_SECRET": "scm_client_secret",
+    "SCM_SCOPE":         "scm_scope",
+}
+
+
+def read_tfvars():
+    values = {}
+    try:
+        with open(TFVARS) as f:
+            for line in f:
+                for env_key, tf_key in TFVAR_KEYS.items():
+                    m = re.match(rf'^\s*{tf_key}\s*=\s*"([^"]+)"', line)
+                    if m:
+                        values[env_key] = m.group(1)
+    except FileNotFoundError:
+        pass
+    return values
+
+
+def get_creds():
+    """Return (client_id, client_secret, scope). Env vars override tfvars."""
+    tfvars = read_tfvars()
+    creds  = {k: os.environ.get(k) or tfvars.get(k) for k in TFVAR_KEYS}
+    missing = [k for k, v in creds.items() if not v]
+    if missing:
+        print(f"ERROR: Missing credentials (set env vars or add to terraform.tfvars): {', '.join(missing)}")
+        sys.exit(1)
+    return creds["SCM_CLIENT_ID"], creds["SCM_CLIENT_SECRET"], creds["SCM_SCOPE"]
 
 
 def get_token(client_id, client_secret, scope):
@@ -79,19 +111,7 @@ def main():
     parser.add_argument("--hostname", default=None,  help="Desired hostname (omit for read-only)")
     args = parser.parse_args()
 
-    client_id     = os.environ.get("SCM_CLIENT_ID")
-    client_secret = os.environ.get("SCM_CLIENT_SECRET")
-    scope         = os.environ.get("SCM_SCOPE")
-
-    missing = [k for k, v in {
-        "SCM_CLIENT_ID": client_id,
-        "SCM_CLIENT_SECRET": client_secret,
-        "SCM_SCOPE": scope,
-    }.items() if not v]
-    if missing:
-        print(f"ERROR: Missing environment variables: {', '.join(missing)}")
-        sys.exit(1)
-
+    client_id, client_secret, scope = get_creds()
     token = get_token(client_id, client_secret, scope)
     items = list_devices(token, args.folder)
 
