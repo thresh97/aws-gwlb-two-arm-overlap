@@ -48,8 +48,24 @@ provider "scm" {
   scope         = var.scm_scope
 }
 
+variable "scm_parent_folder" {
+  type        = string
+  default     = "ngfw-shared"
+  description = "SCM parent folder for the deployment folder"
+}
+
 locals {
   folder = var.dgname
+}
+
+# ---------------------------------------------------------------------------
+# SCM folder
+# ---------------------------------------------------------------------------
+
+resource "scm_folder" "main" {
+  count  = var.enable_scm ? 1 : 0
+  name   = var.dgname
+  parent = var.scm_parent_folder
 }
 
 # ---------------------------------------------------------------------------
@@ -63,6 +79,8 @@ resource "scm_interface_management_profile" "gwlb" {
 
   http         = true
   permitted_ip = [{ name = aws_subnet.gwlb.cidr_block }]
+
+  depends_on = [scm_folder.main]
 }
 
 # ---------------------------------------------------------------------------

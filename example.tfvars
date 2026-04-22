@@ -20,6 +20,7 @@ enable_scm        = true
 scm_client_id     = "your-client-id"
 scm_client_secret = "your-client-secret"
 scm_scope         = "tsg_id:XXXXXXXXXX"
+# scm_parent_folder = "ngfw-shared"  # default
 
 # Management access — used for SG rules and backdoor routes in workload VPCs
 mgmt_cidrs = ["203.0.113.0/24"]

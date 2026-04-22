@@ -75,12 +75,13 @@ Internet → IGW EIP NAT → ENI2 (`ethernet1/2`) → reverse SNAT → `ethernet
 | `scm_client_id` | SCM service account OAuth2 client ID |
 | `scm_client_secret` | SCM service account OAuth2 client secret |
 | `scm_scope` | SCM OAuth2 scope (`tsg_id:XXXXXXXXXX`) |
+| `scm_parent_folder` | Parent folder for the SCM deployment folder (default: `ngfw-shared`) |
 
 ---
 
 ## Prerequisites
 
-1. **SCM folder** — create a folder in SCM matching `dgname` before running `terraform apply`. The Terraform SCM provider cannot create folders.
+1. **SCM folder** — created automatically by `scm_folder.main` under `scm_parent_folder` (default: `ngfw-shared`).
 2. **SCM service account** — create a service account in SCM with sufficient permissions and note the `client_id`, `client_secret`, and `scope`.
 3. **VM-Series Marketplace** — accept the BYOL terms in your AWS account.
 
