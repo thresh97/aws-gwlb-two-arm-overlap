@@ -11,30 +11,30 @@ Single-AZ centralized egress deployment demonstrating VM-Series inspection via A
 ```
                               Internet
                                  │
-                    ┌────────────┴────────────────────────────────┐
+                    ┌────────────┴────────────────────────────────-┐
                     │         Security VPC 172.16.0.0/16           │
-                    │                                               │
-                    │  IGW ◄──► ENI2/ethernet1/2 (untrust, EIP)   │
-                    │                    │                          │
-                    │              VM-Series                        │
-                    │                    │                          │
+                    │                                              │
+                    │  IGW ◄──► ENI2/ethernet1/2 (untrust, EIP)    │
+                    │                    │                         │
+                    │              VM-Series                       │
+                    │                    │                         │
                     │           ENI0/ethernet1/1 (trust)           │
-                    │                    │                          │
-                    │                 [GWLB]                        │
-                    │                                               │
+                    │                    │                         │
+                    │                 [GWLB]                       │
+                    │                                              │
                     │  ENI1/mgmt (EIP) ◄── SSH                     │
-                    └────────────────────┬──────────────────────────┘
+                    └────────────────────┬─────────────────────────┘
                                          │ GWLB Endpoint Service
-                          ┌──────────────┴──────────────┐
-                          │                             │
+                          ┌──────────────┴─────────────┐
+                          │                            │
              ┌────────────▼──────────┐   ┌─────────────▼─────────┐
-             │ Workload VPC 1        │   │ Workload VPC 2         │
-             │ 10.0.0.0/16           │   │ 10.0.0.0/16            │
+             │ Workload VPC 1        │   │ Workload VPC 2        │
+             │ 10.0.0.0/16           │   │ 10.0.0.0/16           │
              │ [GWLBE] 10.0.2.0/24   │   │ [GWLBE] 10.0.2.0/24   │
              │ VM: 10.0.1.10 (EIP)   │   │ VM: 10.0.1.10 (EIP)   │
-             │ RT: 0/0 → GWLBE       │   │ RT: 0/0 → GWLBE        │
-             │ RT: mgmt → IGW        │   │ RT: mgmt → IGW          │
-             └───────────────────────┘   └────────────────────────┘
+             │ RT: 0/0 → GWLBE       │   │ RT: 0/0 → GWLBE       │
+             │ RT: mgmt → IGW        │   │ RT: mgmt → IGW        │
+             └───────────────────────┘   └───────────────────────┘
 ```
 
 **Egress traffic path (C2S):**
